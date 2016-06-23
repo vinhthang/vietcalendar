@@ -1,0 +1,81 @@
+#%RAML 0.8
+---
+title: Vietnam lunar calendar REST API
+version: v1
+baseUri: http://vietnamcalendar-giapha.rhcloud.com
+mediaType:  application/json
+/check_vietnam_holiday:
+  get:
+      queryParameters:
+        dd:
+         displayName: dd
+         type: number
+         required: true
+        MM:
+          displayName: MM
+          type: number
+          required: true
+        yyyy:
+          displayName: yyyy
+          type: number
+          required: true
+      responses:
+            200:
+              body:
+                application/json:
+                  schema: |
+                    { "$schema": "http://json-schema.org/schema",
+                      "type": "boolean",
+                      "description": "return if input date is holiday time in Viet Nam time zone - GMT+7 :)"
+                    }
+/lunar/{ddMMyyy}:
+  get:
+    responses:
+      200:
+        body:
+          application/json:
+            schema: |
+              { "$schema": "http://json-schema.org/schema",
+                "type": "object",
+                "description": "return viet nam lunar date in Viet Nam time zone - GMT+7",
+                "properties": {
+                  "dd":  { "type": "number" },
+                  "MM": {"type": "number"},
+                  "yyyy": {"type": "number"}
+                },
+                "required": [ "dd", "MM", "yyyy" ]
+              }
+/lunar:
+  get:
+    queryParameters:
+      dd:
+       displayName: dd
+       type: number
+       required: true
+      MM:
+        displayName: MM
+        type: number
+        required: true
+      yyyy:
+        displayName: yyyy
+        type: number
+        required: true
+      timeZone:
+        displayName: timeZone
+        type: number
+        required: false
+    responses:
+      200:
+        body:
+          application/json:
+            schema: |
+              { "$schema": "http://json-schema.org/schema",
+                "type": "object",
+                "description": "return vietnamese lunar date, default time zone GMT+7",
+                "properties": {
+                  "dd":  { "type": "number" },
+                  "MM": {"type": "number"},
+                  "yyyy": {"type": "number"}
+                },
+                "required": [ "dd", "MM", "yyyy" ]
+              }

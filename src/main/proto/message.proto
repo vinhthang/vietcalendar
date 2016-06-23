@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package message;
+
+option java_package = "io.github.amlich.calendar";
+
+message DayMonth {
+    int32 day = 1;
+    int32 month = 2;
+}
+
+message MonthYear {
+    int32 month = 1;
+    int32 year = 2;
+}
+
+message DayMonthYear {
+    int32 day = 1;
+    int32 month = 2;
+    int32 year = 3;
+    double time_zone = 4;
+}
+

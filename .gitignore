@@ -1,0 +1,17 @@
+.DS_STORE
+thumbs.db
+
+.idea/
+calendar.iml
+
+target/
+.vertx/
+bin/
+.settings/
+.classpath
+.project
+
+src/main/admin/node_modules/
+src/main/admin/app/*.js
+src/main/admin/app/*.map
+
