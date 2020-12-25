@@ -1,10 +1,7 @@
 package io.github.amlich.calendar;
 
-import io.netty.buffer.ByteBufInputStream;
 import io.vertx.core.buffer.Buffer;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.time.LocalDate;
@@ -13,7 +10,6 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.Optional;
 import java.util.TimeZone;
 
-@RunWith(JUnit4.class)
 public class TestEnv {
 
     @Test
@@ -26,7 +22,7 @@ public class TestEnv {
     @Test
     public void testBufferToInputStream() {
         Buffer b = Buffer.buffer();
-        b.appendByte((byte)10);
+        b.appendByte((byte) 10);
 
         b.getBytes();
 

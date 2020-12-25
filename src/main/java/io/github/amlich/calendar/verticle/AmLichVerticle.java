@@ -5,22 +5,24 @@ import io.github.amlich.calendar.LunarCalendarGuiceModule;
 import io.github.amlich.calendar.endpoint.VietNamHolidayEndPoint;
 import io.github.amlich.calendar.model.DateMonthYear;
 import io.github.amlich.calendar.service.LunarCalendarService;
-import io.vertx.core.*;
-import io.vertx.core.eventbus.Message;
+import io.vertx.core.AbstractVerticle;
+import io.vertx.core.AsyncResult;
+import io.vertx.core.DeploymentOptions;
+import io.vertx.core.Promise;
 import io.vertx.core.json.Json;
-import io.vertx.core.logging.Logger;
-import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.StaticHandler;
+import io.vertx.rxjava.core.eventbus.Message;
+import lombok.extern.slf4j.Slf4j;
 
 import javax.inject.Inject;
 import java.time.LocalDate;
 import java.util.Optional;
 
+@Slf4j
 public class AmLichVerticle extends AbstractVerticle {
-    private static final Logger logger = LoggerFactory.getLogger(AmLichVerticle.class);
     private final LunarCalendarService service;
     private final VietNamHolidayEndPoint vietnamHolidayEndPoint;
     private String deploymentID;
@@ -32,7 +34,7 @@ public class AmLichVerticle extends AbstractVerticle {
     }
 
     @Override
-    public void start(Future<Void> startFuture) {
+    public void start(Promise<Void> startFuture) {
         Guice.createInjector(new LunarCalendarGuiceModule(vertx)).injectMembers(this);
 
         DeploymentOptions options = new DeploymentOptions();
@@ -41,28 +43,27 @@ public class AmLichVerticle extends AbstractVerticle {
         vertx.deployVerticle(new SolarDateToLunarWorkerVerticle(service), options, res -> {
             if (res.succeeded()) {
                 deploymentID = res.result();
-                logger.info("Lunar Worker Started. with ID:" + deploymentID);
-            }
-            else {
-                logger.error("Deploy Lunar Worker Failed: " + res.result());
-                System.exit( -1);
+                log.info("Lunar Worker Started. with ID:" + deploymentID);
+            } else {
+                log.error("Deploy Lunar Worker Failed: " + res.result());
+                System.exit(-1);
             }
         });
 
         Router router = Router.router(vertx);
 
-        router.get("/lunar").handler(r -> {
-            String dd = r.request().getParam("dd");
-            String MM = r.request().getParam("MM");
-            String yyyy = r.request().getParam("yyyy");
-            String timeZone = r.request().getParam("timeZone");
+        router.get("/lunar").handler(ctx -> {
+            String dd = ctx.request().getParam("dd");
+            String MM = ctx.request().getParam("MM");
+            String yyyy = ctx.request().getParam("yyyy");
+            String timeZone = ctx.request().getParam("timeZone");
 
             DateMonthYear message = new DateMonthYear(dd, MM, yyyy, Optional.ofNullable(timeZone));
 
-            logger.debug("got lunar date: " + message);
-            vertx.eventBus().send(SolarDateToLunarWorkerVerticle.CONSUMER, message.getBytes(), (AsyncResult<Message<byte[]>> reply) -> {
-                DateMonthYear result = new DateMonthYear(reply.result().body());
-                r.response()
+            log.debug("got lunar date: " + message);
+            vertx.eventBus().request(SolarDateToLunarWorkerVerticle.CONSUMER, message.getBytes(), (ar) -> {
+                DateMonthYear result = new DateMonthYear((byte[])ar.result().body());
+                ctx.response()
                         .putHeader("content-type", "application/json; charset=utf-8")
                         .end(Json.encodePrettily(result));
             });
@@ -76,7 +77,7 @@ public class AmLichVerticle extends AbstractVerticle {
             r.response()
                     .putHeader("content-type", "application/json; charset=utf-8")
                     .end(service.toLunar(r.request().getParam("ddMMyyyy")).encodePrettily());
-            }).failureHandler(this::defaultFailureHandler);
+        }).failureHandler(this::defaultFailureHandler);
 
         router.route("/").handler(this::home);
 
@@ -87,9 +88,9 @@ public class AmLichVerticle extends AbstractVerticle {
         if (httpAddress == null) httpAddress = "localhost";
         Integer httpPort = Integer.getInteger(System.getProperty("http.port"), 8080);
 
-        logger.info(String.format("listen to http address: %s port: %s", httpAddress, httpPort));
+        log.info(String.format("listen to http address: %s port: %s", httpAddress, httpPort));
         vertx.createHttpServer()
-                .requestHandler(router::accept)
+                .requestHandler(router::handle)
                 .listen(httpPort, httpAddress, result -> {
                     if (result.succeeded()) {
                         startFuture.complete();
@@ -100,8 +101,8 @@ public class AmLichVerticle extends AbstractVerticle {
     }
 
     @Override
-    public void stop(Future<Void> stopFuture) {
-        logger.info("Main Verticle stopped!");
+    public void stop(Promise<Void> stopFuture) {
+        log.info("Main Verticle stopped!");
         //NEED this for unit test to stop or hang forever
         stopFuture.complete();
     }
@@ -114,9 +115,9 @@ public class AmLichVerticle extends AbstractVerticle {
     }
 
     private void defaultFailureHandler(RoutingContext rc) {
-            rc.response()
-                    .putHeader("content-type", "application/json; charset=utf-8")
-                    .setStatusCode(400)
-                    .end(rc.failure().getMessage());
+        rc.response()
+                .putHeader("content-type", "application/json; charset=utf-8")
+                .setStatusCode(400)
+                .end(rc.failure().getMessage());
     }
 }

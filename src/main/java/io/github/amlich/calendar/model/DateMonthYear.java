@@ -59,13 +59,16 @@ public class DateMonthYear {
 
 
     }
+
     @JsonIgnore
-    public byte[] getBytes(){
+    public byte[] getBytes() {
         return message.toByteArray();
     }
+
     public int getDd() {
         return message.getDay();
     }
+
     @JsonProperty("MM")
     public int getMM() {
         return message.getMonth();
@@ -74,6 +77,7 @@ public class DateMonthYear {
     public int getYyyy() {
         return message.getYear();
     }
+
     @JsonIgnore
     public double getTimeZone() {
         return message.getTimeZone();

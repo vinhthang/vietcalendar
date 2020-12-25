@@ -1,7 +1,6 @@
 package io.github.amlich.calendar.service;
 
-import io.vertx.core.logging.Logger;
-import io.vertx.core.logging.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
@@ -15,10 +14,9 @@ import java.util.List;
 /**
  * happy holyday
  */
+@Slf4j
 @Singleton
 public class VietNamNationalHolidayService {
-    private static Logger logger = LoggerFactory.getLogger(VietNamNationalHolidayService.class);
-
     private List<MonthDay> solarHolidayList;
     private List<MonthDay> lunarHolidayList;
 
@@ -30,6 +28,7 @@ public class VietNamNationalHolidayService {
         //@PostConstruct not work :(
         this.init();
     }
+
     //Guice do not support JSR-250
     @PostConstruct
     public void init() {
@@ -55,7 +54,7 @@ public class VietNamNationalHolidayService {
         //mung 3 Tet
         lunarHolidayList.add(MonthDay.of(1, 2));
 
-        logger.info("VietNam National Holiday List inited.");
+        log.info("VietNam National Holiday List inited.");
 
     }
 
@@ -65,13 +64,14 @@ public class VietNamNationalHolidayService {
 
     /**
      * check if date is lunar holiday
+     *
      * @param date
      * @return
      */
     public boolean isInLunarHoliday(final LocalDate date) {
         return lunarHolidayList.stream()
                 .map(monthDay -> calendarService.toSolar(monthDay.atYear(date.getYear())))
-                .filter(lunarDate->lunarDate.equals(date))
+                .filter(lunarDate -> lunarDate.equals(date))
                 .findAny()
                 .isPresent();
     }

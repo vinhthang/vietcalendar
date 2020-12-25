@@ -16,7 +16,7 @@ import java.util.Optional;
  */
 @Singleton
 public class VietNamHolidayEndPoint implements Handler<RoutingContext> {
-    private LunarCalendarService service;
+    private final LunarCalendarService service;
 
     @Inject
     public VietNamHolidayEndPoint(LunarCalendarService service) {

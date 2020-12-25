@@ -26,9 +26,11 @@ public class LunarCalendarGuiceModule extends AbstractModule {
 
     private Properties extractToProperties(JsonObject config) {
         Properties properties = new Properties();
-        config.getMap().keySet().stream().forEach((String key) -> {
-            properties.setProperty(key, config.getValue(key).toString());
-        });
+        config
+                .getMap()
+                .keySet()
+                .stream()
+                .forEach((String key) -> properties.setProperty(key, config.getValue(key).toString()));
         return properties;
     }
 

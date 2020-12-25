@@ -6,7 +6,8 @@ import rx.Observable;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZonedDateTime;
-import java.util.HashSet;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -18,13 +19,13 @@ public class VietCalendarService {
     private Set<YearMonth> leapYearMonth;
 
     public VietCalendarService() {
-        leapYearMonth = new HashSet<>();
-        for (long i = 0; i < 99_000; i++) {
-            YearMonth ym = YearMonth.of(-5000, 1).plusMonths(i);
-            if (isLeap(ym.atDay(1))) {
-                leapYearMonth.add(ym);
-            }
-        }
+//        leapYearMonth = new HashSet<>();
+//        for (long i = 0; i < 99_000; i++) {
+//            YearMonth ym = YearMonth.of(-5000, 1).plusMonths(i);
+//            if (isLeap(ym)) {
+//                leapYearMonth.add(ym);
+//            }
+//        }
     }
 
     public Observable<Boolean> isLeapRx(int jdDate) {
@@ -63,7 +64,10 @@ public class VietCalendarService {
 
     public LocalDate toSolar(LocalDate date, double timeZone) {
         int leap = 0;
-        if (leapYearMonth.contains(YearMonth.of(date.getYear(), date.getMonthValue()))) leap = 1;
+//        if (leapYearMonth.contains(YearMonth.of(date.getYear(), date.getMonthValue()))) leap = 1;
+        if (isSolarLeap(date.getYear())) {
+            leap = 1;
+        }
 
         int[] values = VietCalendar.convertLunar2Solar(
                 date.getDayOfMonth(), date.getMonthValue(), date.getYear(), leap, timeZone);
@@ -80,14 +84,14 @@ public class VietCalendarService {
         return toSolar(date, 7d);
     }
 
-    public Boolean isLeap(Integer jdDate) {
-        int[] s = VietCalendar.jdToDate(jdDate);
-        int[] l = VietCalendar.convertSolar2Lunar(s[0], s[1], s[2], 7d);
-
-        return l[3] == 1;
+    private final List<Integer> leap = Arrays.asList(0, 3, 6, 9, 11, 14, 17);
+    public Boolean isSolarLeap(int year) {
+        return  leap.indexOf(year % 19) > 0;
     }
 
-    public Boolean isLeap(LocalDate date) {
-        return isLeap(VietCalendar.jdFromDate(date.getDayOfMonth(), date.getMonthValue(), date.getYear()));
+    public Boolean isSolarLeap(YearMonth yearMonth) {
+        int[] l = VietCalendar.convertSolar2Lunar(1, yearMonth.getMonthValue(), yearMonth.getYear(), 7d);
+
+        return l[3] == 1;
     }
 }
