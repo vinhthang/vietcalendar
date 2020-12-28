@@ -5,16 +5,17 @@ import io.github.amlich.calendar.LunarCalendarGuiceModule;
 import io.github.amlich.calendar.endpoint.VietNamHolidayEndPoint;
 import io.github.amlich.calendar.model.DateMonthYear;
 import io.github.amlich.calendar.service.LunarCalendarService;
+import io.github.amlich.calendar.service.VietCalendarService;
+import io.github.amlich.calendar.service.VietNamNationalHolidayService;
 import io.vertx.core.AbstractVerticle;
-import io.vertx.core.AsyncResult;
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Promise;
+import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.json.Json;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.StaticHandler;
-import io.vertx.rxjava.core.eventbus.Message;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.inject.Inject;
@@ -28,14 +29,16 @@ public class AmLichVerticle extends AbstractVerticle {
     private String deploymentID;
 
     @Inject
-    public AmLichVerticle(LunarCalendarService service, VietNamHolidayEndPoint vietnamHolidayEndPoint) {
-        this.service = service;
-        this.vietnamHolidayEndPoint = vietnamHolidayEndPoint;
+    public AmLichVerticle() {
+        VietCalendarService calendarService = new VietCalendarService();
+        VietNamNationalHolidayService vietnamNationalHoliday = new VietNamNationalHolidayService(calendarService);
+        this.service = new LunarCalendarService(vietnamNationalHoliday);
+        this.vietnamHolidayEndPoint = new VietNamHolidayEndPoint(service);
     }
 
     @Override
     public void start(Promise<Void> startFuture) {
-        Guice.createInjector(new LunarCalendarGuiceModule(vertx)).injectMembers(this);
+//        Guice.createInjector(new LunarCalendarGuiceModule(vertx)).injectMembers(this);
 
         DeploymentOptions options = new DeploymentOptions();
         options.setWorker(true);
@@ -53,6 +56,9 @@ public class AmLichVerticle extends AbstractVerticle {
         Router router = Router.router(vertx);
 
         router.get("/lunar").handler(ctx -> {
+            HttpServerRequest request = ctx.request();
+            request.pause();
+
             String dd = ctx.request().getParam("dd");
             String MM = ctx.request().getParam("MM");
             String yyyy = ctx.request().getParam("yyyy");
@@ -61,7 +67,9 @@ public class AmLichVerticle extends AbstractVerticle {
             DateMonthYear message = new DateMonthYear(dd, MM, yyyy, Optional.ofNullable(timeZone));
 
             log.debug("got lunar date: " + message);
-            vertx.eventBus().request(SolarDateToLunarWorkerVerticle.CONSUMER, message.getBytes(), (ar) -> {
+
+            ctx.vertx().eventBus().request(SolarDateToLunarWorkerVerticle.CONSUMER, message.getBytes(), (ar) -> {
+                request.resume();
                 DateMonthYear result = new DateMonthYear((byte[])ar.result().body());
                 ctx.response()
                         .putHeader("content-type", "application/json; charset=utf-8")
@@ -69,7 +77,7 @@ public class AmLichVerticle extends AbstractVerticle {
             });
         }).failureHandler(this::defaultFailureHandler);
 
-        router.get("/check_vietnam_holiday")
+        router.get("/vietnam-holiday")
                 .handler(vietnamHolidayEndPoint::handle)
                 .failureHandler(this::defaultFailureHandler);
 
