@@ -57,6 +57,15 @@ The Vietnam Lunar Calendar application was migrated from a Java Vert.x codebase 
 * **Decision:** Pre-compile dependencies using a skeleton `src/lib.rs` and `src/main.rs` before copying source code, and run container as non-root user `appuser` (UID 10001).
 * **Rationale:** Decreases Docker build times on code modifications from minutes to seconds and improves container security.
 
+### ADR-7: Explicit Bidirectional Conversion Endpoints (`/convert/...`)
+* **Decision:** Replaced the legacy 8-digit path parameter route (`/lunar/{ddMMyyyy}`) with standardized, symmetric ISO-8601 conversion routes:
+  1. `GET /convert/solar-to-lunar/{date}`: Accepts ISO date string `YYYY-MM-DD` (e.g. `2015-09-12`).
+  2. `GET /convert/lunar-to-solar/{date}`: Accepts `YYYY-MM-DD` (where `YYYY`=lunar year, `MM`=lunar month, `DD`=lunar day) with optional query parameter `?leap=true/false` to handle leap months (tháng nhuận).
+* **Rationale:** 
+  - Standardizes RESTful path formats to international standard (ISO-8601), eliminating `DD-MM` vs `MM-DD` ambiguity.
+  - Provides full bidirectional conversion symmetry with explicit namespace clarity.
+  - Validates leap month constraints strictly.
+
 ---
 
 ## 4. Architecture Diagram
@@ -69,26 +78,31 @@ graph TD
         Router -->|/swagger-ui| Swagger[OpenAPI / Swagger UI]
         Router -->|/| HomeHandler[home()]
         Router -->|/lunar| LunarQueryHandler[get_lunar()]
-        Router -->|/lunar/:ddMMyyyy| LunarPathHandler[get_lunar_by_path()]
+        Router -->|/convert/solar-to-lunar/:date| SolarToLunarHandler[get_solar_to_lunar()]
+        Router -->|/convert/lunar-to-solar/:date| LunarToSolarHandler[get_lunar_to_solar()]
         Router -->|/vietnam-holiday| HolidayHandler[check_vietnam_holiday()]
         
         LunarQueryHandler -.->|Error| AppError[AppError -> StatusCode 400 + JSON]
-        LunarPathHandler -.->|Error| AppError
+        SolarToLunarHandler -.->|Error| AppError
+        LunarToSolarHandler -.->|Error| AppError
         HolidayHandler -.->|Error| AppError
     end
     
     subgraph "Domain & Services Layer (src/services.rs, src/models.rs)"
         HomeHandler --> ServiceToLunar[to_lunar]
         LunarQueryHandler --> ServiceToLunar
-        LunarPathHandler --> ServiceToLunar
+        SolarToLunarHandler --> ServiceToLunar
+        LunarToSolarHandler --> ServiceToSolar[to_solar]
         HolidayHandler --> ServiceHoliday[is_vietnam_holiday]
         
         ServiceToLunar --> DomainLunar[models::LunarDate]
+        ServiceToSolar --> DomainSolar[chrono::NaiveDate]
         ServiceHoliday --> HolidayEngine[Vietnam Holiday & Compensatory Engine]
     end
     
     subgraph "Astronomical Algorithms (src/calendar.rs)"
         ServiceToLunar --> AstroMath[Jean Meeus AA98 Algorithms]
+        ServiceToSolar --> AstroMath
         ServiceHoliday --> AstroMath
     end
 ```
@@ -101,21 +115,24 @@ graph TD
 
 | File | Change Description |
 | :--- | :--- |
-| [`src/models.rs`](file:///c:/Users/thang/github/vietcalendar/src/models.rs) | Added `LunarDate`, updated `DateMonthYear` with `leap: Option<bool>` and Serde casing aliases. |
-| [`src/services.rs`](file:///c:/Users/thang/github/vietcalendar/src/services.rs) | Implemented safe `to_lunar`, fixed `to_solar` leap month bug, added weekend compensatory holiday logic. |
-| [`src/handlers.rs`](file:///c:/Users/thang/github/vietcalendar/src/handlers.rs) | Added `AppError`, `ErrorResponse`, strongly typed queries, path param handler `get_lunar_by_path`, and UTC+7 time calculation. |
-| [`src/main.rs`](file:///c:/Users/thang/github/vietcalendar/src/main.rs) | Added `/lunar/{ddMMyyyy}` route, registered all OpenAPI schemas and endpoints. |
+| [`src/models.rs`](file:///c:/Users/thang/github/vietcalendar/src/models.rs) | Added `LunarDate`, updated `DateMonthYear` with `leap: Option<bool>` and Serde casing aliases, with unit tests. |
+| [`src/services.rs`](file:///c:/Users/thang/github/vietcalendar/src/services.rs) | Implemented safe `to_lunar`, fixed `to_solar` leap month bug, added weekend compensatory holiday logic, with unit tests. |
+| [`src/handlers.rs`](file:///c:/Users/thang/github/vietcalendar/src/handlers.rs) | Added `AppError`, `ErrorResponse`, strongly typed queries, `/convert/solar-to-lunar/{date}` and `/convert/lunar-to-solar/{date}` handlers, with unit tests. |
+| [`src/main.rs`](file:///c:/Users/thang/github/vietcalendar/src/main.rs) | Registered conversion routes in Axum router and OpenAPI 3.0 specs. |
+| [`src/calendar.rs`](file:///c:/Users/thang/github/vietcalendar/src/calendar.rs) | Astronomical Julian and lunar math, non-leap year validation in `convert_lunar_to_solar`, with unit tests. |
 | [`tests/integration_test.rs`](file:///c:/Users/thang/github/vietcalendar/tests/integration_test.rs) | Updated assertions to use `LunarDate`, un-ignored `test_holiday`, added roundtrip conversion tests. |
-| [`tests/debug_holiday.rs`](file:///c:/Users/thang/github/vietcalendar/tests/debug_holiday.rs) | Removed scratch debugging file. |
 | [`Dockerfile`](file:///c:/Users/thang/github/vietcalendar/Dockerfile) | Optimized with multi-stage cargo dependency caching and added non-root unprivileged `appuser`. |
 
 ### Verification Matrix
 
 | Area | Verification Test | Expected Output | Status |
 | :--- | :--- | :--- | :---: |
-| **Solar to Lunar** | `test_to_lunar`, `test_to_lunar2` | Accurate `LunarDate` output without Gregorian date panics | Passed |
-| **Lunar to Solar** | `test_to_solar` | Correct solar conversion for both leap and non-leap months | Passed |
+| **Solar to Lunar (ISO Path)** | `test_get_solar_to_lunar_endpoint` | Converts `YYYY-MM-DD` to `LunarDate` output | Passed |
+| **Lunar to Solar (Path & Leap)** | `test_get_lunar_to_solar_endpoint` | Converts lunar date to solar date with `?leap=true/false` support | Passed |
+| **Solar to Lunar (Query Params)** | `test_get_lunar_handler` | Parses query parameters and returns `DateMonthYear` | Passed |
+| **Julian Day Calculations** | `test_jd_roundtrip` | Accurate across Gregorian reform (1582) and modern centuries | Passed |
 | **Roundtrip Math** | `test_roundtrip_conversion` | `to_solar(to_lunar(d)) == d` | Passed |
-| **Compensatory Holidays** | `test_holiday` | 2011-04-30 (Sat) & 2011-05-01 (Sun) shift to 2011-05-02 (Mon) & 2011-05-03 (Tue) | Passed |
-| **Error Handling** | Path & query validation | Returns HTTP 400 with `{ "error": "..." }` | Verified |
-| **API Endpoints** | `GET /lunar/12092015` | Parses 8-digit path parameters matching Vert.x parity | Verified |
+| **Compensatory Holidays** | `test_holiday`, `test_vietnam_holidays_with_compensatory` | 2011-04-30 (Sat) & 2011-05-01 (Sun) shift to 2011-05-02 (Mon) & 2011-05-03 (Tue) | Passed |
+| **Error Handling** | `test_app_error_into_response`, invalid input tests | Returns HTTP 400 with `{ "error": "..." }` | Passed |
+| **Domain Serde** | `test_date_month_year_serde`, `test_lunar_date_serde` | Supports `"MM"` and `"mm"` case aliases, skips None `leap` field | Passed |
+

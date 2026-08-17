@@ -49,3 +49,26 @@ Before performing any code modifications, refactoring, or feature development, *
 * **Format & Lint:** `cargo fmt --all -- --check` and `cargo clippy -- -D warnings`
 * **Run Locally:** `cargo run` (default port `8080` or `$PORT` / `$HTTP_PORT`)
 * **Docker Build:** `docker build -t vietcalendar-rs .`
+
+---
+
+## 4. Breaking Changes & Architectural Decisions Protocol
+
+Whenever introducing a **breaking change** (e.g. changing endpoint routes, request/response contracts, modifying domain models, or altering business invariants):
+
+1. **Document in [`docs/ARCHITECTURE_DECISIONS.md`](docs/ARCHITECTURE_DECISIONS.md):**
+   * Immediately record a new Architecture Decision Record (ADR) detailing **Context**, **Decision**, **Rationale**, and **Verification**.
+   * Keep the architecture diagram (`mermaid`) and the **Verification Matrix** updated.
+
+2. **Synchronize [`README.md`](README.md):**
+   * Keep all endpoint descriptions, parameter tables, sample requests, and responses 100% up-to-date with code changes.
+
+3. **Synchronize OpenAPI / Swagger (`utoipa`):**
+   * Update `#[utoipa::path(...)]` attributes on handlers and register paths/schemas in `ApiDoc` inside `src/main.rs`.
+
+4. **Add & Update Unit & Integration Tests:**
+   * Never modify an API contract without writing corresponding unit tests in `src/handlers.rs` (or `src/services.rs`) and verifying with `cargo test`.
+
+5. **Highlight in User Communication:**
+   * Explicitly flag breaking changes and migrations to the user with GitHub warning alerts (`> [!WARNING]`).
+
