@@ -1,55 +1,173 @@
-# viet calendar
-REST service to convert lunar vietnamese date to solar date & vice vesa.
+# VietCalendar (Rust)
 
-### API
- * vietnamcalendar-giapha.rhcloud.com/index.html?raml=api/lunar.raml
+Welcome to the Rust port of the **VietCalendar** API! 🎉 
 
-### Tools in use
-Maven, Vertx, Guice, Protocol Buffer, RAML
- * for maven to run on Windows, need to modify protocExecutable in pom.xml to point to Protocol Buffer compiler.
-### Vertx Web
-MainVerticle receive every request and transfer to other handler/ worker verticle, in different ways :)
- * /lunar?dd will convert request to Protoco Buffer message DateMonthYear and transfer to LunarWorkerVerticle
- 	because I don't like JsonObject goes everywhere internal application. Use Protoco Buffer make app still polyglot :), better than vertx java converter. I strong belive nodejs verticle could handle Protoco Buffer message.
- * /lunar/{ddMMyyyy} use handle
+This project was successfully migrated from its original Java 11 / Maven Vert.x codebase to a high-performance, containerized Rust web application built on top of **Axum** and **Tokio**.
 
- * /check_vietnam_holiday use java 8 lambda
+---
 
-### Raml API schema
- * output is json - no schema as NoSQL, but I think it need schema like the way my old wsdl file do.
- * so I use raml file for api description. I happy to write it by hand rather than machine generate wsdl.
- * the file is lunar.raml
+## 🚀 API Endpoints
 
-### Bussiness Logic
- * de.unileipzig.informatik.VietCalendar for convert lunar date <-> solar date. Copy from  http://www.informatik.uni-leipzig.de/~duc/amlich/
- * VietCalendarService is a wrapper, calculate java LocalDate instead of int values (dd, MM, yyyy, timeZone).
- 	contains a pre calculate leap month for years (need to convert solar date to lunar)
- * VietnamNationalHolidayService for the holiday only :), many TODO things goes here.
+The server exposes the following RESTful endpoints (default port: `8080` or configurable via `$PORT` / `$HTTP_PORT`):
 
-### Unit Test
- * Service Junit
- * Vertx verticle
- * RAML Schema validation
- * these tests do not cover enought but it take my times to pass all. I still stuck on ZonedDateTime & have to hardcode timezone to 7.0 (viet nam GMT time)
+### 1. Today's Lunar Date
+* **Endpoint:** `GET /`
+* **Description:** Returns the current lunar date anchored to Vietnam Indochina Time (UTC+7).
+* **Response (`200 OK`):**
+  ```json
+  {
+    "dd": 17,
+    "mm": 7,
+    "yyyy": 2026
+  }
+  ```
 
-### WRK Performance Test
- * for short, faster than Spring Boot, slower than pojo Servlet (I think)
+---
 
-### Run from IDE
-Vertx app have its main method, need to set it up to run MainVerticle
- * eclipse
- * intelij
-  Run -> Edit Configuration -> Default -> Application -> + -> Application:
-                               	Main class: io.vertx.core.Launcher
-                               	Program argument: run io.github.amlich.calendar.MainVerticle
+### 2. Convert Solar to Lunar (Query Parameters)
+* **Endpoint:** `GET /lunar`
+* **Query Parameters:**
+  | Parameter | Type | Required | Default | Description |
+  | :--- | :---: | :---: | :---: | :--- |
+  | `dd` | integer | Yes | - | Solar day (1–31) |
+  | `mm` / `MM` | integer | Yes | - | Solar month (1–12) |
+  | `yyyy` | integer | Yes | - | Solar year |
+  | `timezone` / `timeZone` | float | No | `7.0` | Timezone offset (default: Vietnam UTC+7) |
+* **Example Request:**
+  ```http
+  GET /lunar?dd=12&mm=9&yyyy=2015
+  ```
+* **Response (`200 OK`):**
+  ```json
+  {
+    "dd": 30,
+    "mm": 7,
+    "yyyy": 2015
+  }
+  ```
+* **Error Response (`400 Bad Request`):**
+  ```json
+  {
+    "error": "Invalid solar date: 31/02/2024"
+  }
+  ```
 
-### Deploy to openshift
- * openshift support vertx 2, so I use an DIY cartridge [Vertx 3 Reference] (https://github.com/vert-x3/vertx-openshift-diy-quickstart)
- * To use openshift ssh & git to push to openshift. need to [install & setup rhc](Https://developers.openshift.com/en/managing-client-tools.html)
-   
-## Final TODO
+---
 
-Version 2 will able to check if input date is holiday. Which is good for check viet nam stock market is open or not.
+### 3. Convert Solar to Lunar (Path Parameter)
+* **Endpoint:** `GET /convert/solar-to-lunar/{date}`
+* **Path Parameter:**
+  * `date` (ISO-8601 string): `YYYY-MM-DD` (e.g. `2015-09-12`)
+* **Query Parameters:** `timezone` (optional, default: `7.0`)
+* **Example Request:**
+  ```http
+  GET /convert/solar-to-lunar/2015-09-12
+  ```
+* **Response (`200 OK`):**
+  ```json
+  {
+    "dd": 30,
+    "mm": 7,
+    "yyyy": 2015
+  }
+  ```
 
-Viet Nam goverment manual decide which time in year is in Tet holiday. In calendar, there are 4 days in Tet. Infact it is a whole week. Goverment will make a day off so people will have 9 holidays span. (2 satuday 4 Tet holiday 2 sunday plus a day off).
-I need a screen to input this information for each year. 
+---
+
+### 4. Convert Lunar to Solar (Path Parameter)
+* **Endpoint:** `GET /convert/lunar-to-solar/{date}`
+* **Path Parameter:**
+  * `date` (format `YYYY-MM-DD`, where YYYY is lunar year, MM is lunar month, DD is lunar day): e.g. `2015-07-30`
+* **Query Parameters:** 
+  | Parameter | Type | Required | Default | Description |
+  | :--- | :---: | :---: | :---: | :--- |
+  | `leap` | boolean | No | `false` | `true` if converting a date within a leap month (tháng nhuận) |
+  | `timezone` | float | No | `7.0` | Timezone offset |
+* **Example Request:**
+  ```http
+  GET /convert/lunar-to-solar/2015-07-30
+  ```
+* **Response (`200 OK`):**
+  ```json
+  {
+    "dd": 12,
+    "mm": 9,
+    "yyyy": 2015
+  }
+  ```
+
+---
+
+### 5. Check Vietnam Public Holiday
+* **Endpoint:** `GET /vietnam-holiday`
+* **Description:** Determines if a date is an official Vietnam holiday (including fixed solar holidays, Giỗ Tổ Hùng Vương, Tết Nguyên Đán Eve + Days 1–3, weekends, and weekend compensatory leave / nghỉ bù).
+* **Query Parameters:** `dd`, `mm` (or `MM`), `yyyy`.
+* **Example Request:**
+  ```http
+  GET /vietnam-holiday?dd=30&mm=4&yyyy=2024
+  ```
+* **Response (`200 OK`):**
+  ```json
+  true
+  ```
+
+---
+
+### 6. Interactive Swagger / OpenAPI Documentation
+* **Swagger UI:** `http://localhost:8080/swagger-ui`
+* **OpenAPI 3.0 Spec:** `http://localhost:8080/api-docs/openapi.json`
+
+---
+
+## 🤖 Model Context Protocol (MCP) Server [Alpha]
+
+VietCalendar includes a built-in **MCP Stdio Server** (`0.1.0-alpha`) for native pairing with AI tools (Claude Desktop, Cursor, Antigravity, Gemini CLI, VS Code).
+
+### Tools Provided to AI Agents
+* `get_today_lunar`: Returns current solar & lunar date in Vietnam (UTC+7).
+* `convert_solar_to_lunar`: Converts solar date to Vietnamese lunar date.
+* `convert_lunar_to_solar`: Converts lunar date to solar date with leap month support.
+* `check_vietnam_holiday`: Checks Vietnam holidays and weekend compensatory leave.
+* `get_year_holidays`: Lists all public holidays and compensatory days for any year.
+
+### Quick Start (Claude Desktop / Cursor)
+```json
+{
+  "mcpServers": {
+    "vietcalendar": {
+      "command": "cargo",
+      "args": ["run", "--release", "--bin", "vietcalendar-mcp"]
+    }
+  }
+}
+```
+For complete setup options, see **[`docs/mcp_setup.md`](docs/mcp_setup.md)**.
+
+---
+
+## 🛠️ Running Locally & Testing
+
+```bash
+# Run unit & integration tests
+cargo test
+
+# Run the HTTP server locally on http://localhost:8080
+cargo run --bin vietcalendar -- serve
+
+# Run the MCP Server over stdio
+cargo run --bin vietcalendar-mcp
+
+# Build production Docker container
+docker build -t vietcalendar-rs .
+```
+
+---
+
+## 📖 Guides & Architectural Decisions
+
+* **[`docs/deployment_guide.md`](docs/deployment_guide.md)**: Cloud Run, Fly.io, and Docker deployment guide.
+* **[`docs/mcp_setup.md`](docs/mcp_setup.md)**: Model Context Protocol configuration guide for AI IDEs.
+* **[`docs/ARCHITECTURE_DECISIONS.md`](docs/ARCHITECTURE_DECISIONS.md)**: Architecture Decision Records (ADR 1–8).
+* **[`GEMINI.md`](GEMINI.md)**: Antigravity repository guidelines and breaking change protocols.
+
+
