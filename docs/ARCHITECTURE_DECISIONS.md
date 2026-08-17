@@ -72,6 +72,21 @@ The Vietnam Lunar Calendar application was migrated from a Java Vert.x codebase 
   - `vietcalendar mcp` / `vietcalendar-mcp`: Starts Alpha MCP stdio server exposing 5 tools (`get_today_lunar`, `convert_solar_to_lunar`, `convert_lunar_to_solar`, `check_vietnam_holiday`, `get_year_holidays`) and 2 resources (`calendar://today`, `calendar://holidays/{year}`).
 * **Rationale:** Enables direct, native integration with modern AI developer tools (Antigravity, Claude Desktop, Cursor, VS Code) while preserving 100% of the production HTTP web server functionality.
 
+### ADR-9: Automated CI/CD Container Publishing to GHCR (`ghcr.io`) & Legacy Cleanup
+* **Decision:**
+  1. Configured automated GitHub Actions workflow in [`.github/workflows/rust.yml`](file:///c:/Users/thang/github/vietcalendar/.github/workflows/rust.yml) triggered on pushes to `master`, `main`, and `rust-port`.
+  2. The workflow performs:
+     - Strict static analysis (`cargo fmt --check`, `cargo clippy -- -D warnings`).
+     - Automated test suite execution across unit and integration tests.
+     - Multi-stage Docker image build using GitHub Actions cache (`type=gha`).
+     - Automatic publication to **GitHub Container Registry (`ghcr.io/vinhthang/vietcalendar:latest`)**.
+  3. Completely removed legacy Java 11, Maven (`pom.xml`, `mvnw`), and RAML assets from `master`, establishing a pure Rust single-binary repository.
+* **Rationale:**
+  - Provides zero-cost, zero-billing cloud container distribution.
+  - Guarantees that any server or local AI assistant (Antigravity, Claude Desktop, Cursor) can instantly pull and run the latest verified container without local compilation toolchains.
+  - Docker cache layer invalidation guarantees consistent incremental build speeds under 60 seconds in CI.
+
+
 
 ---
 
