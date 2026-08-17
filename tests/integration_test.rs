@@ -96,18 +96,38 @@ fn test_roundtrip_conversion() {
 #[test]
 fn test_holiday() {
     // 30 thang 4 nam 2015 (Thursday)
-    assert!(is_vietnam_holiday(NaiveDate::from_ymd_opt(2015, 4, 30).unwrap(), 7.0));
+    assert!(is_vietnam_holiday(
+        NaiveDate::from_ymd_opt(2015, 4, 30).unwrap(),
+        7.0
+    ));
     // 30 thang 4 nam 2011 (Saturday)
-    assert!(is_vietnam_holiday(NaiveDate::from_ymd_opt(2011, 4, 30).unwrap(), 7.0));
+    assert!(is_vietnam_holiday(
+        NaiveDate::from_ymd_opt(2011, 4, 30).unwrap(),
+        7.0
+    ));
     // 02 thang 5 nam 2011 (Monday - compensatory for 30/4)
-    assert!(is_vietnam_holiday(NaiveDate::from_ymd_opt(2011, 5, 2).unwrap(), 7.0));
+    assert!(is_vietnam_holiday(
+        NaiveDate::from_ymd_opt(2011, 5, 2).unwrap(),
+        7.0
+    ));
     // 03 thang 5 nam 2011 (Tuesday - compensatory for 1/5)
-    assert!(is_vietnam_holiday(NaiveDate::from_ymd_opt(2011, 5, 3).unwrap(), 7.0));
+    assert!(is_vietnam_holiday(
+        NaiveDate::from_ymd_opt(2011, 5, 3).unwrap(),
+        7.0
+    ));
     // 04 thang 5 nam 2011 (Wednesday - regular working day)
-    assert!(!is_vietnam_holiday(NaiveDate::from_ymd_opt(2011, 5, 4).unwrap(), 7.0));
+    assert!(!is_vietnam_holiday(
+        NaiveDate::from_ymd_opt(2011, 5, 4).unwrap(),
+        7.0
+    ));
     // 04 thang 5 nam 2015 (Monday - regular working day)
-    assert!(!is_vietnam_holiday(NaiveDate::from_ymd_opt(2015, 5, 4).unwrap(), 7.0));
+    assert!(!is_vietnam_holiday(
+        NaiveDate::from_ymd_opt(2015, 5, 4).unwrap(),
+        7.0
+    ));
     // 03 thang 5 nam 2015 (Sunday - weekend)
-    assert!(is_vietnam_holiday(NaiveDate::from_ymd_opt(2015, 5, 3).unwrap(), 7.0));
+    assert!(is_vietnam_holiday(
+        NaiveDate::from_ymd_opt(2015, 5, 3).unwrap(),
+        7.0
+    ));
 }
-

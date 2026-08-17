@@ -2,12 +2,12 @@ use axum::{routing::get, Router};
 use clap::{Parser, Subcommand};
 use std::env;
 
-use tower_http::trace::TraceLayer;
-use utoipa::OpenApi;
-use utoipa_swagger_ui::SwaggerUi;
 use opentelemetry::global;
 use opentelemetry::trace::TracerProvider as _;
+use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 use vietcalendar_rs::handlers;
 use vietcalendar_rs::mcp;
@@ -27,16 +27,18 @@ use vietcalendar_rs::models;
         handlers::get_lunar_to_solar,
         handlers::check_vietnam_holiday
     ),
-    components(
-        schemas(models::DateMonthYear, models::LunarDate, handlers::ErrorResponse)
-    )
+    components(schemas(models::DateMonthYear, models::LunarDate, handlers::ErrorResponse))
 )]
 struct ApiDoc;
 
 use opentelemetry_sdk::trace::TracerProvider;
 
 #[derive(Parser)]
-#[command(name = "vietcalendar", about = "Vietnam Lunar Calendar Service & MCP Server", version = "0.1.0")]
+#[command(
+    name = "vietcalendar",
+    about = "Vietnam Lunar Calendar Service & MCP Server",
+    version = "0.1.0"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
@@ -60,7 +62,10 @@ fn init_telemetry() {
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| "info,vietcalendar_rs=debug,tower_http=debug".into());
 
-    let exporter = match opentelemetry_otlp::SpanExporter::builder().with_tonic().build() {
+    let exporter = match opentelemetry_otlp::SpanExporter::builder()
+        .with_tonic()
+        .build()
+    {
         Ok(e) => Some(e),
         Err(e) => {
             eprintln!("Failed to build otlp exporter: {:?}", e);
@@ -104,8 +109,14 @@ async fn run_http_server(port_opt: Option<String>) {
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .route("/", get(handlers::home))
         .route("/lunar", get(handlers::get_lunar))
-        .route("/convert/solar-to-lunar/{date}", get(handlers::get_solar_to_lunar))
-        .route("/convert/lunar-to-solar/{date}", get(handlers::get_lunar_to_solar))
+        .route(
+            "/convert/solar-to-lunar/{date}",
+            get(handlers::get_solar_to_lunar),
+        )
+        .route(
+            "/convert/lunar-to-solar/{date}",
+            get(handlers::get_lunar_to_solar),
+        )
         .route("/vietnam-holiday", get(handlers::check_vietnam_holiday))
         .layer(TraceLayer::new_for_http());
 
@@ -134,4 +145,3 @@ async fn main() {
         }
     }
 }
-

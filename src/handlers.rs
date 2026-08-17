@@ -95,9 +95,13 @@ pub async fn home() -> Json<DateMonthYear> {
     )
 )]
 pub async fn get_lunar(Query(q): Query<LunarQuery>) -> Result<Json<DateMonthYear>, AppError> {
-    let date = NaiveDate::from_ymd_opt(q.yyyy, q.mm, q.dd)
-        .ok_or_else(|| AppError::BadRequest(format!("Invalid solar date: {:02}/{:02}/{}", q.dd, q.mm, q.yyyy)))?;
-    
+    let date = NaiveDate::from_ymd_opt(q.yyyy, q.mm, q.dd).ok_or_else(|| {
+        AppError::BadRequest(format!(
+            "Invalid solar date: {:02}/{:02}/{}",
+            q.dd, q.mm, q.yyyy
+        ))
+    })?;
+
     let tz = q.time_zone.unwrap_or(7.0);
     let lunar_date = to_lunar(date, tz);
     Ok(Json(DateMonthYear {
@@ -124,9 +128,10 @@ pub async fn get_solar_to_lunar(
     Path(date_str): Path<String>,
     Query(q): Query<ConvertSolarToLunarQuery>,
 ) -> Result<Json<DateMonthYear>, AppError> {
-    let date = NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
-        .map_err(|_| AppError::BadRequest("Expected ISO date format: YYYY-MM-DD (e.g. 2015-09-12)".to_string()))?;
-    
+    let date = NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").map_err(|_| {
+        AppError::BadRequest("Expected ISO date format: YYYY-MM-DD (e.g. 2015-09-12)".to_string())
+    })?;
+
     let tz = q.time_zone.unwrap_or(7.0);
     let lunar_date = to_lunar(date, tz);
     Ok(Json(DateMonthYear {
@@ -155,20 +160,35 @@ pub async fn get_lunar_to_solar(
 ) -> Result<Json<DateMonthYear>, AppError> {
     let parts: Vec<&str> = date_str.split('-').collect();
     if parts.len() != 3 {
-        return Err(AppError::BadRequest("Expected format: YYYY-MM-DD (e.g. 2015-07-30)".to_string()));
+        return Err(AppError::BadRequest(
+            "Expected format: YYYY-MM-DD (e.g. 2015-07-30)".to_string(),
+        ));
     }
-    let yyyy: i32 = parts[0].parse().map_err(|_| AppError::BadRequest("Invalid year".to_string()))?;
-    let mm: i32 = parts[1].parse().map_err(|_| AppError::BadRequest("Invalid month".to_string()))?;
-    let dd: i32 = parts[2].parse().map_err(|_| AppError::BadRequest("Invalid day".to_string()))?;
+    let yyyy: i32 = parts[0]
+        .parse()
+        .map_err(|_| AppError::BadRequest("Invalid year".to_string()))?;
+    let mm: i32 = parts[1]
+        .parse()
+        .map_err(|_| AppError::BadRequest("Invalid month".to_string()))?;
+    let dd: i32 = parts[2]
+        .parse()
+        .map_err(|_| AppError::BadRequest("Invalid day".to_string()))?;
 
     if !(1..=12).contains(&mm) || !(1..=30).contains(&dd) {
-        return Err(AppError::BadRequest(format!("Invalid lunar date range: {:02}/{:02}/{}", dd, mm, yyyy)));
+        return Err(AppError::BadRequest(format!(
+            "Invalid lunar date range: {:02}/{:02}/{}",
+            dd, mm, yyyy
+        )));
     }
 
     let tz = q.time_zone.unwrap_or(7.0);
     let is_leap = q.leap.unwrap_or(false);
-    let solar_date = to_solar(dd, mm, yyyy, is_leap, tz)
-        .ok_or_else(|| AppError::BadRequest(format!("Invalid lunar date or leap month: {:02}/{:02}/{} (leap: {})", dd, mm, yyyy, is_leap)))?;
+    let solar_date = to_solar(dd, mm, yyyy, is_leap, tz).ok_or_else(|| {
+        AppError::BadRequest(format!(
+            "Invalid lunar date or leap month: {:02}/{:02}/{} (leap: {})",
+            dd, mm, yyyy, is_leap
+        ))
+    })?;
 
     Ok(Json(DateMonthYear {
         dd: solar_date.day() as i32,
@@ -188,9 +208,10 @@ pub async fn get_lunar_to_solar(
     )
 )]
 pub async fn check_vietnam_holiday(Query(q): Query<HolidayQuery>) -> Result<Json<bool>, AppError> {
-    let date = NaiveDate::from_ymd_opt(q.yyyy, q.mm, q.dd)
-        .ok_or_else(|| AppError::BadRequest(format!("Invalid date: {:02}/{:02}/{}", q.dd, q.mm, q.yyyy)))?;
-        
+    let date = NaiveDate::from_ymd_opt(q.yyyy, q.mm, q.dd).ok_or_else(|| {
+        AppError::BadRequest(format!("Invalid date: {:02}/{:02}/{}", q.dd, q.mm, q.yyyy))
+    })?;
+
     Ok(Json(is_vietnam_holiday(date, 7.0)))
 }
 
@@ -241,13 +262,20 @@ mod tests {
     #[tokio::test]
     async fn test_get_solar_to_lunar_endpoint() {
         let q = ConvertSolarToLunarQuery { time_zone: None };
-        let res = get_solar_to_lunar(Path("2015-09-12".to_string()), Query(q)).await.unwrap();
+        let res = get_solar_to_lunar(Path("2015-09-12".to_string()), Query(q))
+            .await
+            .unwrap();
         assert_eq!(res.0.dd, 30);
         assert_eq!(res.0.mm, 7);
         assert_eq!(res.0.yyyy, 2015);
 
         // Invalid ISO format
-        let err = get_solar_to_lunar(Path("12-09-2015".to_string()), Query(ConvertSolarToLunarQuery { time_zone: None })).await.unwrap_err();
+        let err = get_solar_to_lunar(
+            Path("12-09-2015".to_string()),
+            Query(ConvertSolarToLunarQuery { time_zone: None }),
+        )
+        .await
+        .unwrap_err();
         match err {
             AppError::BadRequest(msg) => assert!(msg.contains("Expected ISO date format")),
             _ => panic!("Expected BadRequest"),
@@ -256,21 +284,39 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_lunar_to_solar_endpoint() {
-        let q = ConvertLunarToSolarQuery { leap: Some(false), time_zone: None };
-        let res = get_lunar_to_solar(Path("2015-07-30".to_string()), Query(q)).await.unwrap();
+        let q = ConvertLunarToSolarQuery {
+            leap: Some(false),
+            time_zone: None,
+        };
+        let res = get_lunar_to_solar(Path("2015-07-30".to_string()), Query(q))
+            .await
+            .unwrap();
         assert_eq!(res.0.dd, 12);
         assert_eq!(res.0.mm, 9);
         assert_eq!(res.0.yyyy, 2015);
 
         // Leap month test: 2004 month 2 leap
-        let q_leap = ConvertLunarToSolarQuery { leap: Some(true), time_zone: None };
-        let res_leap = get_lunar_to_solar(Path("2004-02-11".to_string()), Query(q_leap)).await.unwrap();
+        let q_leap = ConvertLunarToSolarQuery {
+            leap: Some(true),
+            time_zone: None,
+        };
+        let res_leap = get_lunar_to_solar(Path("2004-02-11".to_string()), Query(q_leap))
+            .await
+            .unwrap();
         assert_eq!(res_leap.0.dd, 31);
         assert_eq!(res_leap.0.mm, 3);
         assert_eq!(res_leap.0.yyyy, 2004);
 
         // Invalid format
-        let err = get_lunar_to_solar(Path("20150730".to_string()), Query(ConvertLunarToSolarQuery { leap: None, time_zone: None })).await.unwrap_err();
+        let err = get_lunar_to_solar(
+            Path("20150730".to_string()),
+            Query(ConvertLunarToSolarQuery {
+                leap: None,
+                time_zone: None,
+            }),
+        )
+        .await
+        .unwrap_err();
         match err {
             AppError::BadRequest(msg) => assert!(msg.contains("Expected format")),
             _ => panic!("Expected BadRequest"),
@@ -288,6 +334,3 @@ mod tests {
         assert!(res.0);
     }
 }
-
-
-

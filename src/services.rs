@@ -1,5 +1,5 @@
-use std::collections::HashSet;
 use chrono::{Datelike, Duration, NaiveDate, Weekday};
+use std::collections::HashSet;
 
 use crate::calendar::{convert_lunar_to_solar, convert_solar_to_lunar};
 use crate::models::LunarDate;
@@ -24,7 +24,13 @@ pub fn to_lunar(date: NaiveDate, time_zone: f64) -> LunarDate {
     }
 }
 
-pub fn to_solar(day: i32, month: i32, year: i32, is_leap_month: bool, time_zone: f64) -> Option<NaiveDate> {
+pub fn to_solar(
+    day: i32,
+    month: i32,
+    year: i32,
+    is_leap_month: bool,
+    time_zone: f64,
+) -> Option<NaiveDate> {
     let leap = if is_leap_month { 1 } else { 0 };
     let (d, m, y) = convert_lunar_to_solar(day, month, year, leap, time_zone);
     if d == 0 && m == 0 && y == 0 {
@@ -112,7 +118,7 @@ fn get_all_holidays_for_year(solar_year: i32, time_zone: f64) -> HashSet<NaiveDa
                 || comp.weekday() == Weekday::Sun
                 || all_holidays.contains(&comp)
             {
-                comp = comp + Duration::days(1);
+                comp += Duration::days(1);
             }
             all_holidays.insert(comp);
         }
@@ -159,33 +165,62 @@ mod tests {
     #[test]
     fn test_solar_holiday_check() {
         // New Year's Day (1/1)
-        assert!(is_solar_holiday(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap()));
+        assert!(is_solar_holiday(
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap()
+        ));
         // Reunification Day (30/4)
-        assert!(is_solar_holiday(NaiveDate::from_ymd_opt(2024, 4, 30).unwrap()));
+        assert!(is_solar_holiday(
+            NaiveDate::from_ymd_opt(2024, 4, 30).unwrap()
+        ));
         // International Workers' Day (1/5)
-        assert!(is_solar_holiday(NaiveDate::from_ymd_opt(2024, 5, 1).unwrap()));
+        assert!(is_solar_holiday(
+            NaiveDate::from_ymd_opt(2024, 5, 1).unwrap()
+        ));
         // National Day (2/9)
-        assert!(is_solar_holiday(NaiveDate::from_ymd_opt(2024, 9, 2).unwrap()));
+        assert!(is_solar_holiday(
+            NaiveDate::from_ymd_opt(2024, 9, 2).unwrap()
+        ));
         // Regular working day (e.g. Wednesday 15/5/2024)
-        assert!(!is_solar_holiday(NaiveDate::from_ymd_opt(2024, 5, 15).unwrap()));
+        assert!(!is_solar_holiday(
+            NaiveDate::from_ymd_opt(2024, 5, 15).unwrap()
+        ));
     }
 
     #[test]
     fn test_vietnam_holidays_with_compensatory() {
         let tz = 7.0;
         // In 2011: 30/4 (Sat) & 1/5 (Sun) -> 2/5 (Mon) & 3/5 (Tue) are compensatory holidays
-        assert!(is_vietnam_holiday(NaiveDate::from_ymd_opt(2011, 4, 30).unwrap(), tz));
-        assert!(is_vietnam_holiday(NaiveDate::from_ymd_opt(2011, 5, 1).unwrap(), tz));
-        assert!(is_vietnam_holiday(NaiveDate::from_ymd_opt(2011, 5, 2).unwrap(), tz));
-        assert!(is_vietnam_holiday(NaiveDate::from_ymd_opt(2011, 5, 3).unwrap(), tz));
-        assert!(!is_vietnam_holiday(NaiveDate::from_ymd_opt(2011, 5, 4).unwrap(), tz));
+        assert!(is_vietnam_holiday(
+            NaiveDate::from_ymd_opt(2011, 4, 30).unwrap(),
+            tz
+        ));
+        assert!(is_vietnam_holiday(
+            NaiveDate::from_ymd_opt(2011, 5, 1).unwrap(),
+            tz
+        ));
+        assert!(is_vietnam_holiday(
+            NaiveDate::from_ymd_opt(2011, 5, 2).unwrap(),
+            tz
+        ));
+        assert!(is_vietnam_holiday(
+            NaiveDate::from_ymd_opt(2011, 5, 3).unwrap(),
+            tz
+        ));
+        assert!(!is_vietnam_holiday(
+            NaiveDate::from_ymd_opt(2011, 5, 4).unwrap(),
+            tz
+        ));
 
         // Tet Giap Thin 2024: 1/1 Lunar was 2024-02-10 (Saturday)
         // Eve was 2024-02-09 (Friday) -> holiday
-        assert!(is_vietnam_holiday(NaiveDate::from_ymd_opt(2024, 2, 9).unwrap(), tz));
+        assert!(is_vietnam_holiday(
+            NaiveDate::from_ymd_opt(2024, 2, 9).unwrap(),
+            tz
+        ));
         // Tet day 1 (2024-02-10, Sat) -> holiday
-        assert!(is_vietnam_holiday(NaiveDate::from_ymd_opt(2024, 2, 10).unwrap(), tz));
+        assert!(is_vietnam_holiday(
+            NaiveDate::from_ymd_opt(2024, 2, 10).unwrap(),
+            tz
+        ));
     }
 }
-
-

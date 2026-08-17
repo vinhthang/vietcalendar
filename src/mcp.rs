@@ -202,17 +202,38 @@ pub fn handle_request(req: JsonRpcRequest) -> Option<JsonRpcResponse> {
                 "convert_lunar_to_solar" => {
                     let day = match args.get("day").and_then(|v| v.as_i64()) {
                         Some(d) => d as i32,
-                        None => return Some(JsonRpcResponse::error(id, -32602, "Missing required 'day' parameter")),
+                        None => {
+                            return Some(JsonRpcResponse::error(
+                                id,
+                                -32602,
+                                "Missing required 'day' parameter",
+                            ))
+                        }
                     };
                     let month = match args.get("month").and_then(|v| v.as_i64()) {
                         Some(m) => m as i32,
-                        None => return Some(JsonRpcResponse::error(id, -32602, "Missing required 'month' parameter")),
+                        None => {
+                            return Some(JsonRpcResponse::error(
+                                id,
+                                -32602,
+                                "Missing required 'month' parameter",
+                            ))
+                        }
                     };
                     let year = match args.get("year").and_then(|v| v.as_i64()) {
                         Some(y) => y as i32,
-                        None => return Some(JsonRpcResponse::error(id, -32602, "Missing required 'year' parameter")),
+                        None => {
+                            return Some(JsonRpcResponse::error(
+                                id,
+                                -32602,
+                                "Missing required 'year' parameter",
+                            ))
+                        }
                     };
-                    let is_leap = args.get("is_leap_month").and_then(|v| v.as_bool()).unwrap_or(false);
+                    let is_leap = args
+                        .get("is_leap_month")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
                     let tz = args.get("timezone").and_then(|v| v.as_f64()).unwrap_or(7.0);
 
                     match to_solar(day, month, year, is_leap, tz) {
@@ -228,7 +249,16 @@ pub fn handle_request(req: JsonRpcRequest) -> Option<JsonRpcResponse> {
                             "month": solar.month(),
                             "year": solar.year()
                         }),
-                        None => return Some(JsonRpcResponse::error(id, -32602, format!("Invalid lunar date or leap month: {}/{}/{} (leap: {})", day, month, year, is_leap))),
+                        None => {
+                            return Some(JsonRpcResponse::error(
+                                id,
+                                -32602,
+                                format!(
+                                    "Invalid lunar date or leap month: {}/{}/{} (leap: {})",
+                                    day, month, year, is_leap
+                                ),
+                            ))
+                        }
                     }
                 }
                 "check_vietnam_holiday" => {
@@ -246,7 +276,13 @@ pub fn handle_request(req: JsonRpcRequest) -> Option<JsonRpcResponse> {
                 "get_year_holidays" => {
                     let year = match args.get("year").and_then(|v| v.as_i64()) {
                         Some(y) => y as i32,
-                        None => return Some(JsonRpcResponse::error(id, -32602, "Missing required 'year' parameter")),
+                        None => {
+                            return Some(JsonRpcResponse::error(
+                                id,
+                                -32602,
+                                "Missing required 'year' parameter",
+                            ))
+                        }
                     };
                     let tz = args.get("timezone").and_then(|v| v.as_f64()).unwrap_or(7.0);
                     let holidays = compute_holiday_list_for_year(year, tz);
@@ -256,7 +292,13 @@ pub fn handle_request(req: JsonRpcRequest) -> Option<JsonRpcResponse> {
                         "holidays": holidays
                     })
                 }
-                _ => return Some(JsonRpcResponse::error(id, -32601, format!("Tool not found: {}", name))),
+                _ => {
+                    return Some(JsonRpcResponse::error(
+                        id,
+                        -32601,
+                        format!("Tool not found: {}", name),
+                    ))
+                }
             };
 
             let response_payload = json!({
@@ -335,26 +377,51 @@ pub fn handle_request(req: JsonRpcRequest) -> Option<JsonRpcResponse> {
                     });
                     Some(JsonRpcResponse::success(id, payload))
                 } else {
-                    Some(JsonRpcResponse::error(id, -32602, format!("Invalid year in URI: {}", uri)))
+                    Some(JsonRpcResponse::error(
+                        id,
+                        -32602,
+                        format!("Invalid year in URI: {}", uri),
+                    ))
                 }
             } else {
-                Some(JsonRpcResponse::error(id, -32602, format!("Resource not found: {}", uri)))
+                Some(JsonRpcResponse::error(
+                    id,
+                    -32602,
+                    format!("Resource not found: {}", uri),
+                ))
             }
         }
-        _ => Some(JsonRpcResponse::error(id, -32601, format!("Method not found: {}", req.method))),
+        _ => Some(JsonRpcResponse::error(
+            id,
+            -32601,
+            format!("Method not found: {}", req.method),
+        )),
     }
 }
 
 fn parse_solar_input(args: &serde_json::Value) -> Result<(NaiveDate, f64), String> {
     let tz = args.get("timezone").and_then(|v| v.as_f64()).unwrap_or(7.0);
     if let Some(date_str) = args.get("date").and_then(|v| v.as_str()) {
-        let date = NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
-            .map_err(|_| format!("Invalid ISO date format: '{}'. Expected YYYY-MM-DD", date_str))?;
+        let date = NaiveDate::parse_from_str(date_str, "%Y-%m-%d").map_err(|_| {
+            format!(
+                "Invalid ISO date format: '{}'. Expected YYYY-MM-DD",
+                date_str
+            )
+        })?;
         return Ok((date, tz));
     }
-    let day = args.get("day").and_then(|v| v.as_i64()).ok_or("Missing 'date' or 'day'")? as u32;
-    let month = args.get("month").and_then(|v| v.as_i64()).ok_or("Missing 'month'")? as u32;
-    let year = args.get("year").and_then(|v| v.as_i64()).ok_or("Missing 'year'")? as i32;
+    let day = args
+        .get("day")
+        .and_then(|v| v.as_i64())
+        .ok_or("Missing 'date' or 'day'")? as u32;
+    let month = args
+        .get("month")
+        .and_then(|v| v.as_i64())
+        .ok_or("Missing 'month'")? as u32;
+    let year = args
+        .get("year")
+        .and_then(|v| v.as_i64())
+        .ok_or("Missing 'year'")? as i32;
 
     let date = NaiveDate::from_ymd_opt(year, month, day)
         .ok_or_else(|| format!("Invalid date: {:02}/{:02}/{}", day, month, year))?;
@@ -373,16 +440,32 @@ fn compute_holiday_list_for_year(solar_year: i32, time_zone: f64) -> Vec<Holiday
 
     // 1. Fixed Solar Holidays
     if let Some(d) = NaiveDate::from_ymd_opt(solar_year, 1, 1) {
-        list.push(HolidayInfo { date: d.to_string(), name: "Tết Dương Lịch (New Year's Day)".into(), category: "FixedSolar".into() });
+        list.push(HolidayInfo {
+            date: d.to_string(),
+            name: "Tết Dương Lịch (New Year's Day)".into(),
+            category: "FixedSolar".into(),
+        });
     }
     if let Some(d) = NaiveDate::from_ymd_opt(solar_year, 4, 30) {
-        list.push(HolidayInfo { date: d.to_string(), name: "Ngày Giải Phóng Miền Nam (Reunification Day)".into(), category: "FixedSolar".into() });
+        list.push(HolidayInfo {
+            date: d.to_string(),
+            name: "Ngày Giải Phóng Miền Nam (Reunification Day)".into(),
+            category: "FixedSolar".into(),
+        });
     }
     if let Some(d) = NaiveDate::from_ymd_opt(solar_year, 5, 1) {
-        list.push(HolidayInfo { date: d.to_string(), name: "Ngày Quốc Tế Lao Động (International Workers' Day)".into(), category: "FixedSolar".into() });
+        list.push(HolidayInfo {
+            date: d.to_string(),
+            name: "Ngày Quốc Tế Lao Động (International Workers' Day)".into(),
+            category: "FixedSolar".into(),
+        });
     }
     if let Some(d) = NaiveDate::from_ymd_opt(solar_year, 9, 2) {
-        list.push(HolidayInfo { date: d.to_string(), name: "Ngày Quốc Khánh (National Day)".into(), category: "FixedSolar".into() });
+        list.push(HolidayInfo {
+            date: d.to_string(),
+            name: "Ngày Quốc Khánh (National Day)".into(),
+            category: "FixedSolar".into(),
+        });
     }
 
     // 2. Lunar Holidays
@@ -390,26 +473,46 @@ fn compute_holiday_list_for_year(solar_year: i32, time_zone: f64) -> Vec<Holiday
         // Hung Kings: 10/3 Lunar
         if let Some(hk) = to_solar(10, 3, ly, false, time_zone) {
             if hk.year() == solar_year {
-                list.push(HolidayInfo { date: hk.to_string(), name: "Giỗ Tổ Hùng Vương (Hung Kings' Commemoration)".into(), category: "Lunar".into() });
+                list.push(HolidayInfo {
+                    date: hk.to_string(),
+                    name: "Giỗ Tổ Hùng Vương (Hung Kings' Commemoration)".into(),
+                    category: "Lunar".into(),
+                });
             }
         }
         // Tet: Eve, 1/1, 2/1, 3/1 Lunar
         if let Some(tet1) = to_solar(1, 1, ly, false, time_zone) {
             let eve = tet1 - Duration::days(1);
             if eve.year() == solar_year {
-                list.push(HolidayInfo { date: eve.to_string(), name: "Tết Nguyên Đán (Eve - Tất Niên)".into(), category: "Lunar".into() });
+                list.push(HolidayInfo {
+                    date: eve.to_string(),
+                    name: "Tết Nguyên Đán (Eve - Tất Niên)".into(),
+                    category: "Lunar".into(),
+                });
             }
             if tet1.year() == solar_year {
-                list.push(HolidayInfo { date: tet1.to_string(), name: "Tết Nguyên Đán (Mùng 1)".into(), category: "Lunar".into() });
+                list.push(HolidayInfo {
+                    date: tet1.to_string(),
+                    name: "Tết Nguyên Đán (Mùng 1)".into(),
+                    category: "Lunar".into(),
+                });
             }
             if let Some(tet2) = to_solar(2, 1, ly, false, time_zone) {
                 if tet2.year() == solar_year {
-                    list.push(HolidayInfo { date: tet2.to_string(), name: "Tết Nguyên Đán (Mùng 2)".into(), category: "Lunar".into() });
+                    list.push(HolidayInfo {
+                        date: tet2.to_string(),
+                        name: "Tết Nguyên Đán (Mùng 2)".into(),
+                        category: "Lunar".into(),
+                    });
                 }
             }
             if let Some(tet3) = to_solar(3, 1, ly, false, time_zone) {
                 if tet3.year() == solar_year {
-                    list.push(HolidayInfo { date: tet3.to_string(), name: "Tết Nguyên Đán (Mùng 3)".into(), category: "Lunar".into() });
+                    list.push(HolidayInfo {
+                        date: tet3.to_string(),
+                        name: "Tết Nguyên Đán (Mùng 3)".into(),
+                        category: "Lunar".into(),
+                    });
                 }
             }
         }
@@ -467,7 +570,10 @@ mod tests {
         assert_eq!(resp.id, Some(json!(1)));
         let result = resp.result.unwrap();
         assert_eq!(result["serverInfo"]["name"], "vietcalendar-mcp");
-        assert!(result["serverInfo"]["version"].as_str().unwrap().contains("alpha"));
+        assert!(result["serverInfo"]["version"]
+            .as_str()
+            .unwrap()
+            .contains("alpha"));
     }
 
     #[test]

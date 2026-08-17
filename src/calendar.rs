@@ -2,11 +2,6 @@ use std::f64::consts::PI;
 
 /**
  * @author duc
- *
- */
-
-/**
- *
  * @param dd
  * @param mm
  * @param yy
@@ -200,7 +195,13 @@ pub fn convert_solar_to_lunar(dd: i32, mm: i32, yy: i32, time_zone: f64) -> (i32
     (lunar_day, lunar_month, lunar_year, lunar_leap)
 }
 
-pub fn convert_lunar_to_solar(lunar_day: i32, lunar_month: i32, lunar_year: i32, lunar_leap: i32, time_zone: f64) -> (i32, i32, i32) {
+pub fn convert_lunar_to_solar(
+    lunar_day: i32,
+    lunar_month: i32,
+    lunar_year: i32,
+    lunar_leap: i32,
+    time_zone: f64,
+) -> (i32, i32, i32) {
     let a11;
     let b11;
     if lunar_month < 11 {
@@ -235,7 +236,6 @@ pub fn convert_lunar_to_solar(lunar_day: i32, lunar_month: i32, lunar_year: i32,
     jd_to_date(month_start + lunar_day - 1)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -254,7 +254,11 @@ mod tests {
         for &(d, m, y) in &test_dates {
             let jd = jd_from_date(d, m, y);
             let (rd, rm, ry) = jd_to_date(jd);
-            assert_eq!((rd, rm, ry), (d, m, y), "Failed roundtrip for date: {d}/{m}/{y}");
+            assert_eq!(
+                (rd, rm, ry),
+                (d, m, y),
+                "Failed roundtrip for date: {d}/{m}/{y}"
+            );
         }
     }
 
@@ -262,7 +266,10 @@ mod tests {
     fn test_sun_longitude_range() {
         for jd in [2451545.0, 2451545.0 + 100.0, 2451545.0 + 365.25 * 10.0] {
             let l = sun_longitude(jd);
-            assert!(l >= 0.0 && l < 360.0, "Longitude {l} out of bounds for JD {jd}");
+            assert!(
+                l >= 0.0 && l < 360.0,
+                "Longitude {l} out of bounds for JD {jd}"
+            );
         }
     }
 
@@ -271,7 +278,7 @@ mod tests {
         // k = 0 corresponds to 1900-01-01
         let nm0 = new_moon(0);
         assert!(nm0 > 2415000.0 && nm0 < 2415050.0);
-        
+
         let nm1 = new_moon(1);
         let diff = nm1 - nm0;
         // Synodic month is approx 29.53 days
@@ -288,4 +295,3 @@ mod tests {
         assert_eq!((sd, sm, sy), (10, 2, 2024));
     }
 }
-
