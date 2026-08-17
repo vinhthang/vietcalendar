@@ -139,3 +139,85 @@ pub async fn check_vietnam_holiday(Query(q): Query<HolidayQuery>) -> Result<Json
     Ok(Json(is_vietnam_holiday(date, 7.0)))
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_app_error_into_response() {
+        let err = AppError::BadRequest("Test bad request".to_string());
+        let res = err.into_response();
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+        let err_nf = AppError::NotFound("Test not found".to_string());
+        let res_nf = err_nf.into_response();
+        assert_eq!(res_nf.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn test_get_lunar_handler() {
+        let q = LunarQuery {
+            dd: 12,
+            mm: 9,
+            yyyy: 2015,
+            time_zone: Some(7.0),
+        };
+        let res = get_lunar(Query(q)).await.unwrap();
+        assert_eq!(res.0.dd, 30);
+        assert_eq!(res.0.mm, 7);
+        assert_eq!(res.0.yyyy, 2015);
+    }
+
+    #[tokio::test]
+    async fn test_get_lunar_handler_invalid_date() {
+        let q = LunarQuery {
+            dd: 31,
+            mm: 2,
+            yyyy: 2024,
+            time_zone: None,
+        };
+        let err = get_lunar(Query(q)).await.unwrap_err();
+        match err {
+            AppError::BadRequest(msg) => assert!(msg.contains("Invalid solar date")),
+            _ => panic!("Expected BadRequest"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_lunar_by_path_valid() {
+        let res = get_lunar_by_path(Path("12092015".to_string())).await.unwrap();
+        assert_eq!(res.0.dd, 30);
+        assert_eq!(res.0.mm, 7);
+        assert_eq!(res.0.yyyy, 2015);
+    }
+
+    #[tokio::test]
+    async fn test_get_lunar_by_path_invalid() {
+        // Invalid length (< 8)
+        let err1 = get_lunar_by_path(Path("1209".to_string())).await.unwrap_err();
+        match err1 {
+            AppError::BadRequest(msg) => assert!(msg.contains("Expected 8 digits")),
+            _ => panic!("Expected BadRequest"),
+        }
+
+        // Invalid month digits
+        let err2 = get_lunar_by_path(Path("12992015".to_string())).await.unwrap_err();
+        match err2 {
+            AppError::BadRequest(msg) => assert!(msg.contains("Invalid solar date")),
+            _ => panic!("Expected BadRequest"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_check_vietnam_holiday_handler() {
+        let q = HolidayQuery {
+            dd: 30,
+            mm: 4,
+            yyyy: 2015,
+        };
+        let res = check_vietnam_holiday(Query(q)).await.unwrap();
+        assert!(res.0);
+    }
+}
+
+

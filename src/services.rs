@@ -121,3 +121,71 @@ fn get_all_holidays_for_year(solar_year: i32, time_zone: f64) -> HashSet<NaiveDa
     all_holidays
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_metonic_leap_years() {
+        // Years in 19-year Metonic cycle with leap month: 0, 3, 6, 9, 11, 14, 17
+        assert!(is_solar_leap(2020)); // 2020 % 19 = 6
+        assert!(is_solar_leap(2023)); // 2023 % 19 = 9
+        assert!(is_solar_leap(2025)); // 2025 % 19 = 11
+        assert!(!is_solar_leap(2021)); // 2021 % 19 = 7
+        assert!(!is_solar_leap(2022)); // 2022 % 19 = 8
+        assert!(!is_solar_leap(2024)); // 2024 % 19 = 10
+    }
+
+    #[test]
+    fn test_to_lunar_and_to_solar() {
+        let solar_date = NaiveDate::from_ymd_opt(2024, 2, 10).unwrap();
+        let lunar = to_lunar(solar_date, 7.0);
+        assert_eq!(lunar.day, 1);
+        assert_eq!(lunar.month, 1);
+        assert_eq!(lunar.year, 2024);
+        assert!(!lunar.is_leap);
+
+        let converted = to_solar(lunar.day, lunar.month, lunar.year, lunar.is_leap, 7.0).unwrap();
+        assert_eq!(converted, solar_date);
+    }
+
+    #[test]
+    fn test_to_solar_invalid_leap_month() {
+        // In 2024, month 1 is not a leap month. Asking for leap month 1 should return None
+        let invalid = to_solar(1, 1, 2024, true, 7.0);
+        assert_eq!(invalid, None);
+    }
+
+    #[test]
+    fn test_solar_holiday_check() {
+        // New Year's Day (1/1)
+        assert!(is_solar_holiday(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap()));
+        // Reunification Day (30/4)
+        assert!(is_solar_holiday(NaiveDate::from_ymd_opt(2024, 4, 30).unwrap()));
+        // International Workers' Day (1/5)
+        assert!(is_solar_holiday(NaiveDate::from_ymd_opt(2024, 5, 1).unwrap()));
+        // National Day (2/9)
+        assert!(is_solar_holiday(NaiveDate::from_ymd_opt(2024, 9, 2).unwrap()));
+        // Regular working day (e.g. Wednesday 15/5/2024)
+        assert!(!is_solar_holiday(NaiveDate::from_ymd_opt(2024, 5, 15).unwrap()));
+    }
+
+    #[test]
+    fn test_vietnam_holidays_with_compensatory() {
+        let tz = 7.0;
+        // In 2011: 30/4 (Sat) & 1/5 (Sun) -> 2/5 (Mon) & 3/5 (Tue) are compensatory holidays
+        assert!(is_vietnam_holiday(NaiveDate::from_ymd_opt(2011, 4, 30).unwrap(), tz));
+        assert!(is_vietnam_holiday(NaiveDate::from_ymd_opt(2011, 5, 1).unwrap(), tz));
+        assert!(is_vietnam_holiday(NaiveDate::from_ymd_opt(2011, 5, 2).unwrap(), tz));
+        assert!(is_vietnam_holiday(NaiveDate::from_ymd_opt(2011, 5, 3).unwrap(), tz));
+        assert!(!is_vietnam_holiday(NaiveDate::from_ymd_opt(2011, 5, 4).unwrap(), tz));
+
+        // Tet Giap Thin 2024: 1/1 Lunar was 2024-02-10 (Saturday)
+        // Eve was 2024-02-09 (Friday) -> holiday
+        assert!(is_vietnam_holiday(NaiveDate::from_ymd_opt(2024, 2, 9).unwrap(), tz));
+        // Tet day 1 (2024-02-10, Sat) -> holiday
+        assert!(is_vietnam_holiday(NaiveDate::from_ymd_opt(2024, 2, 10).unwrap(), tz));
+    }
+}
+
+

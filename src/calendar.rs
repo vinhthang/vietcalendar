@@ -227,7 +227,65 @@ pub fn convert_lunar_to_solar(lunar_day: i32, lunar_month: i32, lunar_year: i32,
         } else if lunar_leap != 0 || off >= leap_off {
             off += 1;
         }
+    } else if lunar_leap != 0 {
+        // Non-leap year has no leap months
+        return (0, 0, 0);
     }
     let month_start = get_new_moon_day(k + off, time_zone);
     jd_to_date(month_start + lunar_day - 1)
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_jd_roundtrip() {
+        let test_dates = [
+            (1, 1, 2000),
+            (29, 2, 2004),
+            (15, 8, 1945),
+            (30, 4, 1975),
+            (17, 8, 2026),
+            (15, 10, 1582), // Gregorian transition
+            (4, 10, 1582),  // Julian calendar
+        ];
+        for &(d, m, y) in &test_dates {
+            let jd = jd_from_date(d, m, y);
+            let (rd, rm, ry) = jd_to_date(jd);
+            assert_eq!((rd, rm, ry), (d, m, y), "Failed roundtrip for date: {d}/{m}/{y}");
+        }
+    }
+
+    #[test]
+    fn test_sun_longitude_range() {
+        for jd in [2451545.0, 2451545.0 + 100.0, 2451545.0 + 365.25 * 10.0] {
+            let l = sun_longitude(jd);
+            assert!(l >= 0.0 && l < 360.0, "Longitude {l} out of bounds for JD {jd}");
+        }
+    }
+
+    #[test]
+    fn test_new_moon_calculation() {
+        // k = 0 corresponds to 1900-01-01
+        let nm0 = new_moon(0);
+        assert!(nm0 > 2415000.0 && nm0 < 2415050.0);
+        
+        let nm1 = new_moon(1);
+        let diff = nm1 - nm0;
+        // Synodic month is approx 29.53 days
+        assert!((diff - 29.53).abs() < 1.0);
+    }
+
+    #[test]
+    fn test_solar_to_lunar_and_back() {
+        // 2024-02-10 is Lunar New Year (1/1/2024 Giap Thin)
+        let (ld, lm, ly, leap) = convert_solar_to_lunar(10, 2, 2024, 7.0);
+        assert_eq!((ld, lm, ly, leap), (1, 1, 2024, 0));
+
+        let (sd, sm, sy) = convert_lunar_to_solar(1, 1, 2024, 0, 7.0);
+        assert_eq!((sd, sm, sy), (10, 2, 2024));
+    }
+}
+
