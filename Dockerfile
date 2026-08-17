@@ -1,5 +1,6 @@
-FROM rust:1.94 as builder
+FROM rust:1.94 AS builder
 WORKDIR /usr/src/app
+
 
 # Pre-fetch and build dependencies for Docker layer caching
 COPY Cargo.toml Cargo.lock ./
@@ -10,12 +11,13 @@ RUN mkdir -p src/bin tests && \
     touch src/calendar.rs src/handlers.rs src/mcp.rs src/models.rs src/services.rs && \
     echo "fn main() {}" > tests/integration_test.rs && \
     cargo build --release && \
-    rm -rf src tests target/release/vietcalendar* target/release/deps/vietcalendar*
+    rm -rf src tests
 
 # Copy actual source code and build final binaries
 COPY src ./src
 COPY tests ./tests
-RUN cargo build --release
+RUN touch src/lib.rs src/main.rs src/bin/vietcalendar-mcp.rs && cargo build --release
+
 
 FROM debian:bookworm-slim
 # Install ca-certificates and tzdata
