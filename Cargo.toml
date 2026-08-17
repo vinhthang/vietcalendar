@@ -21,5 +21,7 @@ tracing-opentelemetry = "0.28.0"
 
 # Swagger / OpenAPI
 utoipa = { version = "5.3.1", features = ["chrono", "axum_extras"] }
-utoipa-swagger-ui = { version = "9.0.0", features = ["axum"] }
+utoipa-swagger-ui = { version = "9.0.0", features = ["axum", "vendored"] }
+
+
 
