@@ -94,9 +94,10 @@ The Vietnam Lunar Calendar application was migrated from a Java Vert.x codebase 
 
 ```mermaid
 graph TD
-    Client[HTTP Client / Frontend] -->|HTTP GET| Router[Axum Router]
+    HttpClient[HTTP Client / Frontend] -->|HTTP REST| Router[Axum Router]
+    AiClient[AI Assistant / Antigravity / Claude] -->|JSON-RPC 2.0 stdio| McpServer[MCP Engine (src/mcp.rs)]
     
-    subgraph "API & Transport Layer (src/handlers.rs, src/main.rs)"
+    subgraph "API & Transport Layer (src/handlers.rs, src/main.rs, src/mcp.rs)"
         Router -->|/swagger-ui| Swagger[OpenAPI / Swagger UI]
         Router -->|/| HomeHandler[home()]
         Router -->|/lunar| LunarQueryHandler[get_lunar()]
@@ -104,6 +105,14 @@ graph TD
         Router -->|/convert/lunar-to-solar/:date| LunarToSolarHandler[get_lunar_to_solar()]
         Router -->|/vietnam-holiday| HolidayHandler[check_vietnam_holiday()]
         
+        McpServer -->|Tool: get_today_lunar| McpToday[get_today_lunar]
+        McpServer -->|Tool: convert_solar_to_lunar| McpSolarToLunar[convert_solar_to_lunar]
+        McpServer -->|Tool: convert_lunar_to_solar| McpLunarToSolar[convert_lunar_to_solar]
+        McpServer -->|Tool: check_vietnam_holiday| McpHoliday[check_vietnam_holiday]
+        McpServer -->|Tool: get_year_holidays| McpYearHolidays[get_year_holidays]
+        McpServer -->|Resource: calendar://today| McpResToday[calendar://today]
+        McpServer -->|Resource: calendar://holidays/:year| McpResHolidays[calendar://holidays/:year]
+
         LunarQueryHandler -.->|Error| AppError[AppError -> StatusCode 400 + JSON]
         SolarToLunarHandler -.->|Error| AppError
         LunarToSolarHandler -.->|Error| AppError
@@ -117,15 +126,25 @@ graph TD
         LunarToSolarHandler --> ServiceToSolar[to_solar]
         HolidayHandler --> ServiceHoliday[is_vietnam_holiday]
         
+        McpToday --> ServiceToLunar
+        McpSolarToLunar --> ServiceToLunar
+        McpLunarToSolar --> ServiceToSolar
+        McpHoliday --> ServiceHoliday
+        McpYearHolidays --> ServiceHolidayList[get_vietnam_holidays_for_year]
+        McpResToday --> ServiceToLunar
+        McpResHolidays --> ServiceHolidayList
+        
         ServiceToLunar --> DomainLunar[models::LunarDate]
         ServiceToSolar --> DomainSolar[chrono::NaiveDate]
         ServiceHoliday --> HolidayEngine[Vietnam Holiday & Compensatory Engine]
+        ServiceHolidayList --> HolidayEngine
     end
     
     subgraph "Astronomical Algorithms (src/calendar.rs)"
         ServiceToLunar --> AstroMath[Jean Meeus AA98 Algorithms]
         ServiceToSolar --> AstroMath
         ServiceHoliday --> AstroMath
+        HolidayEngine --> AstroMath
     end
 ```
 
@@ -140,10 +159,13 @@ graph TD
 | [`src/models.rs`](file:///c:/Users/thang/github/vietcalendar/src/models.rs) | Added `LunarDate`, updated `DateMonthYear` with `leap: Option<bool>` and Serde casing aliases, with unit tests. |
 | [`src/services.rs`](file:///c:/Users/thang/github/vietcalendar/src/services.rs) | Implemented safe `to_lunar`, fixed `to_solar` leap month bug, added weekend compensatory holiday logic, with unit tests. |
 | [`src/handlers.rs`](file:///c:/Users/thang/github/vietcalendar/src/handlers.rs) | Added `AppError`, `ErrorResponse`, strongly typed queries, `/convert/solar-to-lunar/{date}` and `/convert/lunar-to-solar/{date}` handlers, with unit tests. |
-| [`src/main.rs`](file:///c:/Users/thang/github/vietcalendar/src/main.rs) | Registered conversion routes in Axum router and OpenAPI 3.0 specs. |
+| [`src/mcp.rs`](file:///c:/Users/thang/github/vietcalendar/src/mcp.rs) | Implemented JSON-RPC 2.0 stdio MCP server exposing 5 tools, 2 resources, and unit test suite. |
+| [`src/bin/vietcalendar-mcp.rs`](file:///c:/Users/thang/github/vietcalendar/src/bin/vietcalendar-mcp.rs) | Standalone binary target for dedicated MCP Stdio mode. |
+| [`src/main.rs`](file:///c:/Users/thang/github/vietcalendar/src/main.rs) | Added `clap` CLI dual mode (`serve` vs `mcp`), registered conversion routes in Axum router and OpenAPI 3.0 specs. |
 | [`src/calendar.rs`](file:///c:/Users/thang/github/vietcalendar/src/calendar.rs) | Astronomical Julian and lunar math, non-leap year validation in `convert_lunar_to_solar`, with unit tests. |
 | [`tests/integration_test.rs`](file:///c:/Users/thang/github/vietcalendar/tests/integration_test.rs) | Updated assertions to use `LunarDate`, un-ignored `test_holiday`, added roundtrip conversion tests. |
-| [`Dockerfile`](file:///c:/Users/thang/github/vietcalendar/Dockerfile) | Optimized with multi-stage cargo dependency caching and added non-root unprivileged `appuser`. |
+| [`Dockerfile`](file:///c:/Users/thang/github/vietcalendar/Dockerfile) | Optimized with multi-stage cargo dependency caching, `touch` cache invalidation, and added non-root unprivileged `appuser`. |
+| [`.github/workflows/rust.yml`](file:///c:/Users/thang/github/vietcalendar/.github/workflows/rust.yml) | Automated CI/CD workflow running fmt, clippy, tests, and publishing Docker images to `ghcr.io/vinhthang/vietcalendar:latest`. |
 
 ### Verification Matrix
 
@@ -157,4 +179,10 @@ graph TD
 | **Compensatory Holidays** | `test_holiday`, `test_vietnam_holidays_with_compensatory` | 2011-04-30 (Sat) & 2011-05-01 (Sun) shift to 2011-05-02 (Mon) & 2011-05-03 (Tue) | Passed |
 | **Error Handling** | `test_app_error_into_response`, invalid input tests | Returns HTTP 400 with `{ "error": "..." }` | Passed |
 | **Domain Serde** | `test_date_month_year_serde`, `test_lunar_date_serde` | Supports `"MM"` and `"mm"` case aliases, skips None `leap` field | Passed |
+| **MCP Protocol Handshake** | `test_mcp_initialize` | Advertises `vietcalendar-mcp 0.1.0-alpha (experimental)` version `2024-11-05` | Passed |
+| **MCP Tools Listing** | `test_mcp_tools_list` | Returns 5 registered tool definitions with input JSON schemas | Passed |
+| **MCP Tool Calls** | `test_mcp_convert_solar_to_lunar_call`, `test_mcp_convert_lunar_to_solar_call` | Executes astronomical conversions over JSON-RPC 2.0 stdio | Passed |
+| **MCP Resources** | `test_mcp_resources` | Resolves `calendar://today` and `calendar://holidays/{year}` snapshots | Passed |
+| **Container Publishing** | GitHub Actions Workflow on `master` | Successfully builds and publishes to `ghcr.io/vinhthang/vietcalendar:latest` | Passed |
+
 
