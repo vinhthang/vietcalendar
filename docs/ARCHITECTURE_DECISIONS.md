@@ -66,6 +66,13 @@ The Vietnam Lunar Calendar application was migrated from a Java Vert.x codebase 
   - Provides full bidirectional conversion symmetry with explicit namespace clarity.
   - Validates leap month constraints strictly.
 
+### ADR-8: Model Context Protocol (MCP) Server Support [Alpha]
+* **Decision:** Implemented JSON-RPC 2.0 stdio Model Context Protocol (MCP) server capabilities in [`src/mcp.rs`](file:///c:/Users/thang/github/vietcalendar/src/mcp.rs) and created a dual-mode CLI with `clap`:
+  - `vietcalendar serve`: Starts Axum HTTP REST web server.
+  - `vietcalendar mcp` / `vietcalendar-mcp`: Starts Alpha MCP stdio server exposing 5 tools (`get_today_lunar`, `convert_solar_to_lunar`, `convert_lunar_to_solar`, `check_vietnam_holiday`, `get_year_holidays`) and 2 resources (`calendar://today`, `calendar://holidays/{year}`).
+* **Rationale:** Enables direct, native integration with modern AI developer tools (Antigravity, Claude Desktop, Cursor, VS Code) while preserving 100% of the production HTTP web server functionality.
+
+
 ---
 
 ## 4. Architecture Diagram

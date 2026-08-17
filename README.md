@@ -119,14 +119,43 @@ The server exposes the following RESTful endpoints (default port: `8080` or conf
 
 ---
 
+## 🤖 Model Context Protocol (MCP) Server [Alpha]
+
+VietCalendar includes a built-in **MCP Stdio Server** (`0.1.0-alpha`) for native pairing with AI tools (Claude Desktop, Cursor, Antigravity, Gemini CLI, VS Code).
+
+### Tools Provided to AI Agents
+* `get_today_lunar`: Returns current solar & lunar date in Vietnam (UTC+7).
+* `convert_solar_to_lunar`: Converts solar date to Vietnamese lunar date.
+* `convert_lunar_to_solar`: Converts lunar date to solar date with leap month support.
+* `check_vietnam_holiday`: Checks Vietnam holidays and weekend compensatory leave.
+* `get_year_holidays`: Lists all public holidays and compensatory days for any year.
+
+### Quick Start (Claude Desktop / Cursor)
+```json
+{
+  "mcpServers": {
+    "vietcalendar": {
+      "command": "cargo",
+      "args": ["run", "--release", "--bin", "vietcalendar-mcp"]
+    }
+  }
+}
+```
+For complete setup options, see **[`docs/mcp_setup.md`](docs/mcp_setup.md)**.
+
+---
+
 ## 🛠️ Running Locally & Testing
 
 ```bash
 # Run unit & integration tests
 cargo test
 
-# Run the server locally on http://localhost:8080
-cargo run
+# Run the HTTP server locally on http://localhost:8080
+cargo run --bin vietcalendar -- serve
+
+# Run the MCP Server over stdio
+cargo run --bin vietcalendar-mcp
 
 # Build production Docker container
 docker build -t vietcalendar-rs .
@@ -134,9 +163,11 @@ docker build -t vietcalendar-rs .
 
 ---
 
-## 📖 Architecture & Design Decisions
+## 📖 Guides & Architectural Decisions
 
-For detailed architectural breakdown, domain modeling rationale, astronomical algorithms, and verification details, refer to:
-* **[`docs/ARCHITECTURE_DECISIONS.md`](docs/ARCHITECTURE_DECISIONS.md)** (Architecture Decision Record)
-* **[`GEMINI.md`](GEMINI.md)** (Antigravity AI repository guidelines)
+* **[`docs/deployment_guide.md`](docs/deployment_guide.md)**: Cloud Run, Fly.io, and Docker deployment guide.
+* **[`docs/mcp_setup.md`](docs/mcp_setup.md)**: Model Context Protocol configuration guide for AI IDEs.
+* **[`docs/ARCHITECTURE_DECISIONS.md`](docs/ARCHITECTURE_DECISIONS.md)**: Architecture Decision Records (ADR 1–8).
+* **[`GEMINI.md`](GEMINI.md)**: Antigravity repository guidelines and breaking change protocols.
+
 

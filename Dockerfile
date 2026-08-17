@@ -3,15 +3,16 @@ WORKDIR /usr/src/app
 
 # Pre-fetch and build dependencies for Docker layer caching
 COPY Cargo.toml Cargo.lock ./
-RUN mkdir src tests && \
+RUN mkdir -p src/bin tests && \
     echo "fn main() {}" > src/main.rs && \
-    echo "pub mod calendar; pub mod handlers; pub mod models; pub mod services;" > src/lib.rs && \
-    touch src/calendar.rs src/handlers.rs src/models.rs src/services.rs && \
+    echo "fn main() {}" > src/bin/vietcalendar-mcp.rs && \
+    echo "pub mod calendar; pub mod handlers; pub mod mcp; pub mod models; pub mod services;" > src/lib.rs && \
+    touch src/calendar.rs src/handlers.rs src/mcp.rs src/models.rs src/services.rs && \
     echo "fn main() {}" > tests/integration_test.rs && \
     cargo build --release && \
-    rm -rf src tests target/release/vietcalendar-rs target/release/deps/vietcalendar_rs*
+    rm -rf src tests target/release/vietcalendar* target/release/deps/vietcalendar*
 
-# Copy actual source code and build final binary
+# Copy actual source code and build final binaries
 COPY src ./src
 COPY tests ./tests
 RUN cargo build --release
@@ -24,7 +25,13 @@ RUN apt-get update && apt-get install -y ca-certificates tzdata && rm -rf /var/l
 RUN useradd -u 10001 -m -s /bin/sh appuser
 USER appuser
 
-COPY --from=builder /usr/src/app/target/release/vietcalendar-rs /usr/local/bin/vietcalendar-rs
+COPY --from=builder /usr/src/app/target/release/vietcalendar /usr/local/bin/vietcalendar
+COPY --from=builder /usr/src/app/target/release/vietcalendar-mcp /usr/local/bin/vietcalendar-mcp
+
+# Alias for backwards compatibility
+USER root
+RUN ln -s /usr/local/bin/vietcalendar /usr/local/bin/vietcalendar-rs
+USER appuser
 
 ENV PORT=8080
 ENV TOKIO_WORKER_THREADS=2
@@ -32,5 +39,6 @@ ENV RUST_LOG=info
 
 EXPOSE 8080
 
-CMD ["vietcalendar-rs"]
+CMD ["vietcalendar", "serve"]
+
 

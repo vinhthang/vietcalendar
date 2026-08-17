@@ -1,4 +1,5 @@
 use axum::{routing::get, Router};
+use clap::{Parser, Subcommand};
 use std::env;
 
 use tower_http::trace::TraceLayer;
@@ -9,6 +10,7 @@ use opentelemetry::trace::TracerProvider as _;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use vietcalendar_rs::handlers;
+use vietcalendar_rs::mcp;
 use vietcalendar_rs::models;
 
 #[derive(OpenApi)]
@@ -32,6 +34,27 @@ use vietcalendar_rs::models;
 struct ApiDoc;
 
 use opentelemetry_sdk::trace::TracerProvider;
+
+#[derive(Parser)]
+#[command(name = "vietcalendar", about = "Vietnam Lunar Calendar Service & MCP Server", version = "0.1.0")]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+
+    #[arg(short, long, env = "PORT")]
+    port: Option<String>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Start the Axum HTTP REST API Web Server (default)
+    Serve {
+        #[arg(short, long, env = "PORT")]
+        port: Option<String>,
+    },
+    /// Start the Model Context Protocol (MCP) Stdio Server [Alpha]
+    Mcp,
+}
 
 fn init_telemetry() {
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
@@ -67,16 +90,16 @@ fn init_telemetry() {
     }
 }
 
-#[tokio::main]
-async fn main() {
+async fn run_http_server(port_opt: Option<String>) {
     init_telemetry();
 
-    let port = env::var("PORT")
-        .or_else(|_| env::var("HTTP_PORT"))
-        .unwrap_or_else(|_| "8080".to_string());
-    
+    let port = port_opt
+        .or_else(|| env::var("PORT").ok())
+        .or_else(|| env::var("HTTP_PORT").ok())
+        .unwrap_or_else(|| "8080".to_string());
+
     let addr = format!("0.0.0.0:{}", port);
-    
+
     let app = Router::new()
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .route("/", get(handlers::home))
@@ -86,10 +109,29 @@ async fn main() {
         .route("/vietnam-holiday", get(handlers::check_vietnam_holiday))
         .layer(TraceLayer::new_for_http());
 
-
     tracing::info!("Listening on http://{}", addr);
     tracing::info!("Swagger UI at http://{}/swagger-ui", addr);
 
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
+
+#[tokio::main]
+async fn main() {
+    let cli = Cli::parse();
+
+    match cli.command {
+        Some(Commands::Mcp) => {
+            if let Err(e) = mcp::run_stdio_server().await {
+                eprintln!("MCP server error: {}", e);
+            }
+        }
+        Some(Commands::Serve { port }) => {
+            run_http_server(port.or(cli.port)).await;
+        }
+        None => {
+            run_http_server(cli.port).await;
+        }
+    }
+}
+
