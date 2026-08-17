@@ -21,10 +21,11 @@ use vietcalendar_rs::models;
     paths(
         handlers::home,
         handlers::get_lunar,
+        handlers::get_lunar_by_path,
         handlers::check_vietnam_holiday
     ),
     components(
-        schemas(models::DateMonthYear)
+        schemas(models::DateMonthYear, models::LunarDate, handlers::ErrorResponse)
     )
 )]
 struct ApiDoc;
@@ -79,6 +80,7 @@ async fn main() {
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .route("/", get(handlers::home))
         .route("/lunar", get(handlers::get_lunar))
+        .route("/lunar/{ddMMyyyy}", get(handlers::get_lunar_by_path))
         .route("/vietnam-holiday", get(handlers::check_vietnam_holiday))
         .layer(TraceLayer::new_for_http());
 

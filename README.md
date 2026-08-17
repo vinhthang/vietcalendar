@@ -10,4 +10,4 @@ This project was successfully and fully migrated from its original Java 11 / Mav
 * **Modernized Deployment**: Operations were built around a generic Docker container targeting zero-setup deployments mapping any dynamic `$PORT` via environment variables.
 * **Preserved Unit Testing**: All core logic assertions originally built via JUnit are successfully encapsulated inside the new built-in test suites, executed using `cargo test`.
 
-For a designated architectural breakdown mapping the original structures to their new modules, refer to the included `implementation_plan.md` file designed by Antigravity AI!
+For a designated architectural breakdown mapping the original structures to their new modules, design decisions, and verification matrix, refer to the included [`ARCHITECTURE_DECISIONS.md`](ARCHITECTURE_DECISIONS.md) file!
