@@ -21,7 +21,8 @@ use vietcalendar_rs::models;
     paths(
         handlers::home,
         handlers::get_lunar,
-        handlers::get_lunar_by_path,
+        handlers::get_solar_to_lunar,
+        handlers::get_lunar_to_solar,
         handlers::check_vietnam_holiday
     ),
     components(
@@ -80,9 +81,11 @@ async fn main() {
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .route("/", get(handlers::home))
         .route("/lunar", get(handlers::get_lunar))
-        .route("/lunar/{ddMMyyyy}", get(handlers::get_lunar_by_path))
+        .route("/convert/solar-to-lunar/{date}", get(handlers::get_solar_to_lunar))
+        .route("/convert/lunar-to-solar/{date}", get(handlers::get_lunar_to_solar))
         .route("/vietnam-holiday", get(handlers::check_vietnam_holiday))
         .layer(TraceLayer::new_for_http());
+
 
     tracing::info!("Listening on http://{}", addr);
     tracing::info!("Swagger UI at http://{}/swagger-ui", addr);

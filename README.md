@@ -55,12 +55,13 @@ The server exposes the following RESTful endpoints (default port: `8080` or conf
 ---
 
 ### 3. Convert Solar to Lunar (Path Parameter)
-* **Endpoint:** `GET /lunar/{ddMMyyyy}`
+* **Endpoint:** `GET /convert/solar-to-lunar/{date}`
 * **Path Parameter:**
-  * `ddMMyyyy` (8-digit string): e.g. `12092015` for 12 September 2015.
+  * `date` (ISO-8601 string): `YYYY-MM-DD` (e.g. `2015-09-12`)
+* **Query Parameters:** `timezone` (optional, default: `7.0`)
 * **Example Request:**
   ```http
-  GET /lunar/12092015
+  GET /convert/solar-to-lunar/2015-09-12
   ```
 * **Response (`200 OK`):**
   ```json
@@ -73,7 +74,31 @@ The server exposes the following RESTful endpoints (default port: `8080` or conf
 
 ---
 
-### 4. Check Vietnam Public Holiday
+### 4. Convert Lunar to Solar (Path Parameter)
+* **Endpoint:** `GET /convert/lunar-to-solar/{date}`
+* **Path Parameter:**
+  * `date` (format `YYYY-MM-DD`, where YYYY is lunar year, MM is lunar month, DD is lunar day): e.g. `2015-07-30`
+* **Query Parameters:** 
+  | Parameter | Type | Required | Default | Description |
+  | :--- | :---: | :---: | :---: | :--- |
+  | `leap` | boolean | No | `false` | `true` if converting a date within a leap month (tháng nhuận) |
+  | `timezone` | float | No | `7.0` | Timezone offset |
+* **Example Request:**
+  ```http
+  GET /convert/lunar-to-solar/2015-07-30
+  ```
+* **Response (`200 OK`):**
+  ```json
+  {
+    "dd": 12,
+    "mm": 9,
+    "yyyy": 2015
+  }
+  ```
+
+---
+
+### 5. Check Vietnam Public Holiday
 * **Endpoint:** `GET /vietnam-holiday`
 * **Description:** Determines if a date is an official Vietnam holiday (including fixed solar holidays, Giỗ Tổ Hùng Vương, Tết Nguyên Đán Eve + Days 1–3, weekends, and weekend compensatory leave / nghỉ bù).
 * **Query Parameters:** `dd`, `mm` (or `MM`), `yyyy`.
@@ -88,7 +113,7 @@ The server exposes the following RESTful endpoints (default port: `8080` or conf
 
 ---
 
-### 5. Interactive Swagger / OpenAPI Documentation
+### 6. Interactive Swagger / OpenAPI Documentation
 * **Swagger UI:** `http://localhost:8080/swagger-ui`
 * **OpenAPI 3.0 Spec:** `http://localhost:8080/api-docs/openapi.json`
 

@@ -4,12 +4,12 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use chrono::{NaiveDate, Utc};
+use chrono::{Datelike, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
 use crate::models::DateMonthYear;
-use crate::services::{is_vietnam_holiday, to_lunar};
+use crate::services::{is_vietnam_holiday, to_lunar, to_solar};
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ErrorResponse {
@@ -52,6 +52,21 @@ pub struct HolidayQuery {
     pub yyyy: i32,
 }
 
+#[derive(Deserialize, IntoParams)]
+#[allow(non_snake_case)]
+pub struct ConvertSolarToLunarQuery {
+    #[serde(alias = "timeZone", alias = "timezone")]
+    pub time_zone: Option<f64>,
+}
+
+#[derive(Deserialize, IntoParams)]
+#[allow(non_snake_case)]
+pub struct ConvertLunarToSolarQuery {
+    pub leap: Option<bool>,
+    #[serde(alias = "timeZone", alias = "timezone")]
+    pub time_zone: Option<f64>,
+}
+
 #[utoipa::path(
     get,
     path = "/",
@@ -75,7 +90,7 @@ pub async fn home() -> Json<DateMonthYear> {
     path = "/lunar",
     params(LunarQuery),
     responses(
-        (status = 200, description = "Convert a solar date to a lunar date", body = DateMonthYear),
+        (status = 200, description = "Convert a solar date to a lunar date via query params", body = DateMonthYear),
         (status = 400, description = "Invalid date format", body = ErrorResponse)
     )
 )]
@@ -95,31 +110,71 @@ pub async fn get_lunar(Query(q): Query<LunarQuery>) -> Result<Json<DateMonthYear
 
 #[utoipa::path(
     get,
-    path = "/lunar/{ddMMyyyy}",
+    path = "/convert/solar-to-lunar/{date}",
     params(
-        ("ddMMyyyy" = String, Path, description = "Date formatted as 8 digits (e.g. 12092015)")
+        ("date" = String, Path, description = "Solar date in ISO format YYYY-MM-DD (e.g. 2015-09-12)"),
+        ConvertSolarToLunarQuery
     ),
     responses(
-        (status = 200, description = "Convert path formatted solar date to lunar date", body = DateMonthYear),
+        (status = 200, description = "Convert solar date to lunar date", body = DateMonthYear),
         (status = 400, description = "Invalid date format", body = ErrorResponse)
     )
 )]
-pub async fn get_lunar_by_path(Path(param): Path<String>) -> Result<Json<DateMonthYear>, AppError> {
-    if param.len() != 8 {
-        return Err(AppError::BadRequest("Expected 8 digits format: ddMMyyyy".to_string()));
-    }
-    let dd: u32 = param[0..2].parse().map_err(|_| AppError::BadRequest("Invalid day digits".to_string()))?;
-    let mm: u32 = param[2..4].parse().map_err(|_| AppError::BadRequest("Invalid month digits".to_string()))?;
-    let yyyy: i32 = param[4..8].parse().map_err(|_| AppError::BadRequest("Invalid year digits".to_string()))?;
+pub async fn get_solar_to_lunar(
+    Path(date_str): Path<String>,
+    Query(q): Query<ConvertSolarToLunarQuery>,
+) -> Result<Json<DateMonthYear>, AppError> {
+    let date = NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
+        .map_err(|_| AppError::BadRequest("Expected ISO date format: YYYY-MM-DD (e.g. 2015-09-12)".to_string()))?;
     
-    let date = NaiveDate::from_ymd_opt(yyyy, mm, dd)
-        .ok_or_else(|| AppError::BadRequest(format!("Invalid solar date: {:02}/{:02}/{}", dd, mm, yyyy)))?;
-    let lunar_date = to_lunar(date, 7.0);
+    let tz = q.time_zone.unwrap_or(7.0);
+    let lunar_date = to_lunar(date, tz);
     Ok(Json(DateMonthYear {
         dd: lunar_date.day,
         mm: lunar_date.month,
         yyyy: lunar_date.year,
         leap: if lunar_date.is_leap { Some(true) } else { None },
+    }))
+}
+
+#[utoipa::path(
+    get,
+    path = "/convert/lunar-to-solar/{date}",
+    params(
+        ("date" = String, Path, description = "Lunar date in format YYYY-MM-DD (e.g. 2015-07-30)"),
+        ConvertLunarToSolarQuery
+    ),
+    responses(
+        (status = 200, description = "Convert lunar date to solar date", body = DateMonthYear),
+        (status = 400, description = "Invalid lunar date or leap month", body = ErrorResponse)
+    )
+)]
+pub async fn get_lunar_to_solar(
+    Path(date_str): Path<String>,
+    Query(q): Query<ConvertLunarToSolarQuery>,
+) -> Result<Json<DateMonthYear>, AppError> {
+    let parts: Vec<&str> = date_str.split('-').collect();
+    if parts.len() != 3 {
+        return Err(AppError::BadRequest("Expected format: YYYY-MM-DD (e.g. 2015-07-30)".to_string()));
+    }
+    let yyyy: i32 = parts[0].parse().map_err(|_| AppError::BadRequest("Invalid year".to_string()))?;
+    let mm: i32 = parts[1].parse().map_err(|_| AppError::BadRequest("Invalid month".to_string()))?;
+    let dd: i32 = parts[2].parse().map_err(|_| AppError::BadRequest("Invalid day".to_string()))?;
+
+    if !(1..=12).contains(&mm) || !(1..=30).contains(&dd) {
+        return Err(AppError::BadRequest(format!("Invalid lunar date range: {:02}/{:02}/{}", dd, mm, yyyy)));
+    }
+
+    let tz = q.time_zone.unwrap_or(7.0);
+    let is_leap = q.leap.unwrap_or(false);
+    let solar_date = to_solar(dd, mm, yyyy, is_leap, tz)
+        .ok_or_else(|| AppError::BadRequest(format!("Invalid lunar date or leap month: {:02}/{:02}/{} (leap: {})", dd, mm, yyyy, is_leap)))?;
+
+    Ok(Json(DateMonthYear {
+        dd: solar_date.day() as i32,
+        mm: solar_date.month() as i32,
+        yyyy: solar_date.year(),
+        leap: None,
     }))
 }
 
@@ -184,26 +239,40 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_lunar_by_path_valid() {
-        let res = get_lunar_by_path(Path("12092015".to_string())).await.unwrap();
+    async fn test_get_solar_to_lunar_endpoint() {
+        let q = ConvertSolarToLunarQuery { time_zone: None };
+        let res = get_solar_to_lunar(Path("2015-09-12".to_string()), Query(q)).await.unwrap();
         assert_eq!(res.0.dd, 30);
         assert_eq!(res.0.mm, 7);
         assert_eq!(res.0.yyyy, 2015);
+
+        // Invalid ISO format
+        let err = get_solar_to_lunar(Path("12-09-2015".to_string()), Query(ConvertSolarToLunarQuery { time_zone: None })).await.unwrap_err();
+        match err {
+            AppError::BadRequest(msg) => assert!(msg.contains("Expected ISO date format")),
+            _ => panic!("Expected BadRequest"),
+        }
     }
 
     #[tokio::test]
-    async fn test_get_lunar_by_path_invalid() {
-        // Invalid length (< 8)
-        let err1 = get_lunar_by_path(Path("1209".to_string())).await.unwrap_err();
-        match err1 {
-            AppError::BadRequest(msg) => assert!(msg.contains("Expected 8 digits")),
-            _ => panic!("Expected BadRequest"),
-        }
+    async fn test_get_lunar_to_solar_endpoint() {
+        let q = ConvertLunarToSolarQuery { leap: Some(false), time_zone: None };
+        let res = get_lunar_to_solar(Path("2015-07-30".to_string()), Query(q)).await.unwrap();
+        assert_eq!(res.0.dd, 12);
+        assert_eq!(res.0.mm, 9);
+        assert_eq!(res.0.yyyy, 2015);
 
-        // Invalid month digits
-        let err2 = get_lunar_by_path(Path("12992015".to_string())).await.unwrap_err();
-        match err2 {
-            AppError::BadRequest(msg) => assert!(msg.contains("Invalid solar date")),
+        // Leap month test: 2004 month 2 leap
+        let q_leap = ConvertLunarToSolarQuery { leap: Some(true), time_zone: None };
+        let res_leap = get_lunar_to_solar(Path("2004-02-11".to_string()), Query(q_leap)).await.unwrap();
+        assert_eq!(res_leap.0.dd, 31);
+        assert_eq!(res_leap.0.mm, 3);
+        assert_eq!(res_leap.0.yyyy, 2004);
+
+        // Invalid format
+        let err = get_lunar_to_solar(Path("20150730".to_string()), Query(ConvertLunarToSolarQuery { leap: None, time_zone: None })).await.unwrap_err();
+        match err {
+            AppError::BadRequest(msg) => assert!(msg.contains("Expected format")),
             _ => panic!("Expected BadRequest"),
         }
     }
@@ -219,5 +288,6 @@ mod tests {
         assert!(res.0);
     }
 }
+
 
 
