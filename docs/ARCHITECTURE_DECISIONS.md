@@ -87,6 +87,25 @@ The Vietnam Lunar Calendar application was migrated from a Java Vert.x codebase 
   - Docker cache layer invalidation guarantees consistent incremental build speeds under 60 seconds in CI.
 
 
+### ADR-10: Dependency Modernization and Rust 1.97 Toolchain Upgrade
+* **Decision:**
+  1. Upgraded Rust compilation toolchain in `Dockerfile` and developer guidelines from Rust 1.94 to **Rust 1.97**.
+  2. Updated all core runtime and framework dependencies to their latest compatible releases:
+     - `tokio`: `1.43.0` -> `1.53.1`
+     - `axum`: `0.8.8` -> `0.8.9`
+     - `serde`: `1.0.217` -> `1.0.229`
+     - `serde_json`: `1.0.138` -> `1.0.151`
+     - `chrono`: `0.4.39` -> `0.4.45`
+     - `tracing`: `0.1.41` -> `0.1.44`
+     - `tracing-subscriber`: `0.3.19` -> `0.3.23`
+     - `tower-http`: `0.6.2` -> `0.6.11`
+     - `utoipa`: `5.3.1` -> `5.5.0`
+     - `utoipa-swagger-ui`: `9.0.0` -> `9.0.2`
+     - `clap`: `4.5.30` -> `4.6.6`
+* **Rationale:**
+  - Incorporates latest security patches, performance improvements, and bug fixes across all asynchronous runtime, serialization, and web transport layers.
+  - Keeps OpenAPI generator (`utoipa`) and Swagger UI aligned with recent schema rendering enhancements.
+  - Ensures seamless compatibility with standard Rust 2021/2024 edition evolution.
 
 ---
 

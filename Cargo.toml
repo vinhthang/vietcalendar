@@ -4,27 +4,27 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = "0.8.8"
-tokio = { version = "1.43.0", features = ["full"] }
-serde = { version = "1.0.217", features = ["derive"] }
-serde_json = "1.0.138"
-chrono = { version = "0.4.39", features = ["serde"] }
+axum = "0.8.9"
+tokio = { version = "1.53.1", features = ["full"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+chrono = { version = "0.4.45", features = ["serde"] }
 
 # Logging, Tracing, Opentelemetry
-tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-tower-http = { version = "0.6.2", features = ["trace"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+tower-http = { version = "0.6.11", features = ["trace"] }
 opentelemetry = "0.27.1"
 opentelemetry_sdk = { version = "0.27.1", features = ["rt-tokio"] }
 opentelemetry-otlp = { version = "0.27.0", features = ["grpc-tonic", "tokio", "trace"] }
 tracing-opentelemetry = "0.28.0"
 
 # Swagger / OpenAPI
-utoipa = { version = "5.3.1", features = ["chrono", "axum_extras"] }
-utoipa-swagger-ui = { version = "9.0.0", features = ["axum", "vendored"] }
+utoipa = { version = "5.5.0", features = ["chrono", "axum_extras"] }
+utoipa-swagger-ui = { version = "9.0.2", features = ["axum", "vendored"] }
 
 # CLI Argument Parsing
-clap = { version = "4.5.30", features = ["derive", "env"] }
+clap = { version = "4.6.6", features = ["derive", "env"] }
 
 [[bin]]
 name = "vietcalendar"

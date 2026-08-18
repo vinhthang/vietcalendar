@@ -1,8 +1,12 @@
 use chrono::{Datelike, Duration, NaiveDate, Weekday};
 use std::collections::HashSet;
+use std::sync::{OnceLock, RwLock};
+use std::collections::HashMap;
 
 use crate::calendar::{convert_lunar_to_solar, convert_solar_to_lunar};
 use crate::models::LunarDate;
+
+static HOLIDAY_CACHE: OnceLock<RwLock<HashMap<i32, HashSet<NaiveDate>>>> = OnceLock::new();
 
 pub fn is_solar_leap(year: i32) -> bool {
     let modulo = year % 19;
@@ -47,8 +51,19 @@ pub fn is_vietnam_holiday(date: NaiveDate, time_zone: f64) -> bool {
     }
 
     let year = date.year();
-    let holidays = get_all_holidays_for_year(year, time_zone);
-    holidays.contains(&date)
+    let holidays = {
+        let cache = HOLIDAY_CACHE.get_or_init(|| RwLock::new(HashMap::new())).read().unwrap();
+        cache.get(&year).cloned()
+    };
+    
+    match holidays {
+        Some(h) => h.contains(&date),
+        None => {
+            let h = get_all_holidays_for_year(year, time_zone);
+            HOLIDAY_CACHE.get().unwrap().write().unwrap().insert(year, h.clone());
+            h.contains(&date)
+        }
+    }
 }
 
 pub fn is_solar_holiday(date: NaiveDate) -> bool {

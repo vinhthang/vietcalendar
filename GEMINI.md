@@ -44,7 +44,7 @@ Before performing any code modifications, refactoring, or feature development, *
 
 ## 3. Technology Stack & Commands
 
-* **Language & Framework:** Rust 1.94, Axum 0.8, Tokio 1.43, Chrono 0.4, Utoipa 5.4.
+* **Language & Framework:** Rust 1.97, Axum 0.8, Tokio 1.53, Chrono 0.4, Utoipa 5.5, Clap 4.6.
 * **Run Tests:** `cargo test`
 * **Format & Lint:** `cargo fmt --all -- --check` and `cargo clippy -- -D warnings`
 * **Run Locally:** `cargo run` (default port `8080` or `$PORT` / `$HTTP_PORT`)
