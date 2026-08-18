@@ -105,7 +105,16 @@ The Vietnam Lunar Calendar application was migrated from a Java Vert.x codebase 
 * **Rationale:**
   - Incorporates latest security patches, performance improvements, and bug fixes across all asynchronous runtime, serialization, and web transport layers.
   - Keeps OpenAPI generator (`utoipa`) and Swagger UI aligned with recent schema rendering enhancements.
-  - Ensures seamless compatibility with standard Rust 2021/2024 edition evolution.
+### ADR-11: Public Remote MCP over HTTP/SSE Transport with Permissive CORS
+* **Decision:**
+  1. Implemented official Model Context Protocol (MCP) Server-Sent Events (SSE) remote transport:
+     - `GET /mcp/sse`: Generates a unique UUID session, registers client channel in `McpSessionManager`, and emits the initial `endpoint` event (`event: endpoint\ndata: /mcp/message?sessionId=<uuid>`).
+     - `POST /mcp/message?sessionId=<uuid>`: Receives JSON-RPC 2.0 requests and pushes responses asynchronously back to the matching client's SSE stream as `event: message`.
+  2. Enabled permissive Cross-Origin Resource Sharing (CORS) using `tower_http::cors::CorsLayer::permissive()` allowing all headers, origins, and methods.
+  3. Preserved full dual-transport capability: `vietcalendar serve` exposes both HTTP REST API and remote MCP SSE, while `vietcalendar-mcp` provides standalone `stdio` mode for local CLI pairing.
+* **Rationale:**
+  - Enables public internet access for remote AI clients (Claude Desktop, Cursor, ChatGPT plugins, web-based agents) with zero-configuration friction.
+  - Keeps all transport routing native in the single Axum binary without requiring external sidecar proxies or secondary ports.
 
 ---
 

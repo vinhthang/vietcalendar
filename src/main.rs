@@ -1,9 +1,14 @@
-use axum::{routing::get, Router};
+use axum::{
+    routing::{get, post},
+    Router,
+};
 use clap::{Parser, Subcommand};
 use std::env;
+use std::sync::Arc;
 
 use opentelemetry::global;
 use opentelemetry::trace::TracerProvider as _;
+use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa::OpenApi;
@@ -105,6 +110,13 @@ async fn run_http_server(port_opt: Option<String>) {
 
     let addr = format!("0.0.0.0:{}", port);
 
+    let mcp_session_manager = Arc::new(mcp::McpSessionManager::new());
+
+    let cors = CorsLayer::new()
+        .allow_methods(Any)
+        .allow_origin(Any)
+        .allow_headers(Any);
+
     let app = Router::new()
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .route("/", get(handlers::home))
@@ -118,10 +130,15 @@ async fn run_http_server(port_opt: Option<String>) {
             get(handlers::get_lunar_to_solar),
         )
         .route("/vietnam-holiday", get(handlers::check_vietnam_holiday))
+        .route("/mcp/sse", get(mcp::sse_handler))
+        .route("/mcp/message", post(mcp::message_handler))
+        .with_state(mcp_session_manager)
+        .layer(cors)
         .layer(TraceLayer::new_for_http());
 
     tracing::info!("Listening on http://{}", addr);
     tracing::info!("Swagger UI at http://{}/swagger-ui", addr);
+    tracing::info!("Remote MCP SSE endpoint at http://{}/mcp/sse", addr);
 
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();

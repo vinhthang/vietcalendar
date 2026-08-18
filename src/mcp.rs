@@ -1,7 +1,17 @@
 use chrono::{Datelike, Duration, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::sync::{mpsc, RwLock};
+use tokio_stream::StreamExt as _;
+
+use axum::extract::{Query, State};
+use axum::http::StatusCode;
+use axum::response::sse::{Event, KeepAlive, Sse};
+use axum::response::{IntoResponse, Response};
+use axum::Json;
 
 use crate::services::{is_vietnam_holiday, to_lunar, to_solar};
 
@@ -554,6 +564,130 @@ pub async fn run_stdio_server() -> io::Result<()> {
     Ok(())
 }
 
+/// Thread-safe registry for active MCP SSE client connections
+#[derive(Clone, Default)]
+pub struct McpSessionManager {
+    sessions: Arc<RwLock<HashMap<String, mpsc::UnboundedSender<Event>>>>,
+}
+
+impl McpSessionManager {
+    pub fn new() -> Self {
+        Self {
+            sessions: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    pub async fn register(&self, session_id: String, tx: mpsc::UnboundedSender<Event>) {
+        let mut lock = self.sessions.write().await;
+        lock.insert(session_id, tx);
+    }
+
+    pub async fn remove(&self, session_id: &str) {
+        let mut lock = self.sessions.write().await;
+        lock.remove(session_id);
+    }
+
+    pub async fn send_to_session(&self, session_id: &str, event: Event) -> bool {
+        let lock = self.sessions.read().await;
+        if let Some(tx) = lock.get(session_id) {
+            tx.send(event).is_ok()
+        } else {
+            false
+        }
+    }
+
+    pub async fn active_sessions_count(&self) -> usize {
+        self.sessions.read().await.len()
+    }
+}
+
+pub struct SessionStream<S> {
+    stream: S,
+    session_id: String,
+    session_manager: Arc<McpSessionManager>,
+}
+
+impl<S: tokio_stream::Stream<Item = Result<Event, std::convert::Infallible>> + Unpin>
+    tokio_stream::Stream for SessionStream<S>
+{
+    type Item = Result<Event, std::convert::Infallible>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        std::pin::Pin::new(&mut self.stream).poll_next(cx)
+    }
+}
+
+impl<S> Drop for SessionStream<S> {
+    fn drop(&mut self) {
+        let manager = self.session_manager.clone();
+        let id = self.session_id.clone();
+        tokio::spawn(async move {
+            manager.remove(&id).await;
+        });
+    }
+}
+
+/// GET /mcp/sse: Establishes a remote Server-Sent Events (SSE) connection
+pub async fn sse_handler(
+    State(session_manager): State<Arc<McpSessionManager>>,
+) -> impl IntoResponse {
+    let session_id = uuid::Uuid::new_v4().to_string();
+    let (tx, rx) = mpsc::unbounded_channel::<Event>();
+
+    let initial_endpoint_event = Event::default()
+        .event("endpoint")
+        .data(format!("/mcp/message?sessionId={}", session_id));
+    let _ = tx.send(initial_endpoint_event);
+
+    session_manager.register(session_id.clone(), tx).await;
+
+    let stream = tokio_stream::wrappers::UnboundedReceiverStream::new(rx)
+        .map(Ok::<_, std::convert::Infallible>);
+
+    let session_stream = SessionStream {
+        stream,
+        session_id,
+        session_manager,
+    };
+
+    Sse::new(session_stream).keep_alive(KeepAlive::default())
+}
+
+#[derive(Deserialize)]
+pub struct MessageQuery {
+    #[serde(alias = "sessionId", alias = "session_id")]
+    pub session_id: String,
+}
+
+/// POST /mcp/message: Accepts JSON-RPC requests and pushes responses through the SSE stream
+pub async fn message_handler(
+    State(session_manager): State<Arc<McpSessionManager>>,
+    Query(query): Query<MessageQuery>,
+    Json(req): Json<JsonRpcRequest>,
+) -> Response {
+    if let Some(resp) = handle_request(req) {
+        let json_str = serde_json::to_string(&resp).unwrap_or_default();
+        let event = Event::default().event("message").data(json_str);
+        if session_manager
+            .send_to_session(&query.session_id, event)
+            .await
+        {
+            StatusCode::ACCEPTED.into_response()
+        } else {
+            (
+                StatusCode::NOT_FOUND,
+                "Session not found or connection closed",
+            )
+                .into_response()
+        }
+    } else {
+        StatusCode::ACCEPTED.into_response()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -664,5 +798,31 @@ mod tests {
         let resp_read = handle_request(req_read).unwrap();
         let res_read = resp_read.result.unwrap();
         assert!(!res_read["contents"][0]["text"].as_str().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_mcp_session_manager() {
+        let manager = McpSessionManager::new();
+        assert_eq!(manager.active_sessions_count().await, 0);
+
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        manager.register("session-1".to_string(), tx).await;
+        assert_eq!(manager.active_sessions_count().await, 1);
+
+        let test_event = Event::default().event("test").data("payload");
+        let sent = manager.send_to_session("session-1", test_event).await;
+        assert!(sent);
+
+        // Verify channel received event
+        let recv = rx.recv().await;
+        assert!(recv.is_some());
+
+        // Test remove
+        manager.remove("session-1").await;
+        assert_eq!(manager.active_sessions_count().await, 0);
+        let sent_after_remove = manager
+            .send_to_session("session-1", Event::default().data("payload"))
+            .await;
+        assert!(!sent_after_remove);
     }
 }

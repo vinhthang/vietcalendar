@@ -10,10 +10,12 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 chrono = { version = "0.4.45", features = ["serde"] }
 
-# Logging, Tracing, Opentelemetry
+# Logging, Tracing, Opentelemetry, Web Utilities
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
-tower-http = { version = "0.6.11", features = ["trace"] }
+tower-http = { version = "0.6.11", features = ["trace", "cors"] }
+tokio-stream = { version = "0.1.19", features = ["sync"] }
+uuid = { version = "1.15.1", features = ["v4"] }
 opentelemetry = "0.27.1"
 opentelemetry_sdk = { version = "0.27.1", features = ["rt-tokio"] }
 opentelemetry-otlp = { version = "0.27.0", features = ["grpc-tonic", "tokio", "trace"] }

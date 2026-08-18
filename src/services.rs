@@ -1,7 +1,7 @@
 use chrono::{Datelike, Duration, NaiveDate, Weekday};
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::{OnceLock, RwLock};
-use std::collections::HashMap;
 
 use crate::calendar::{convert_lunar_to_solar, convert_solar_to_lunar};
 use crate::models::LunarDate;
@@ -52,15 +52,23 @@ pub fn is_vietnam_holiday(date: NaiveDate, time_zone: f64) -> bool {
 
     let year = date.year();
     let holidays = {
-        let cache = HOLIDAY_CACHE.get_or_init(|| RwLock::new(HashMap::new())).read().unwrap();
+        let cache = HOLIDAY_CACHE
+            .get_or_init(|| RwLock::new(HashMap::new()))
+            .read()
+            .unwrap();
         cache.get(&year).cloned()
     };
-    
+
     match holidays {
         Some(h) => h.contains(&date),
         None => {
             let h = get_all_holidays_for_year(year, time_zone);
-            HOLIDAY_CACHE.get().unwrap().write().unwrap().insert(year, h.clone());
+            HOLIDAY_CACHE
+                .get()
+                .unwrap()
+                .write()
+                .unwrap()
+                .insert(year, h.clone());
             h.contains(&date)
         }
     }

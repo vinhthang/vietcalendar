@@ -121,16 +121,16 @@ The server exposes the following RESTful endpoints (default port: `8080` or conf
 
 ## 🤖 Model Context Protocol (MCP) Server [Alpha]
 
-VietCalendar includes a built-in **MCP Stdio Server** (`0.1.0-alpha`) for native pairing with AI tools (Claude Desktop, Cursor, Antigravity, Gemini CLI, VS Code).
+VietCalendar provides full **Model Context Protocol (MCP)** support for AI assistants (Claude Desktop, Cursor, Antigravity, Gemini CLI, VS Code, and custom web agents).
 
-### Tools Provided to AI Agents
-* `get_today_lunar`: Returns current solar & lunar date in Vietnam (UTC+7).
-* `convert_solar_to_lunar`: Converts solar date to Vietnamese lunar date.
-* `convert_lunar_to_solar`: Converts lunar date to solar date with leap month support.
-* `check_vietnam_holiday`: Checks Vietnam holidays and weekend compensatory leave.
-* `get_year_holidays`: Lists all public holidays and compensatory days for any year.
+### 1. Remote MCP over HTTP / Server-Sent Events (Public Internet Access)
+Connect directly to the live server over SSE without running local processes:
+* **SSE Endpoint:** `GET http://<host>:8080/mcp/sse` (or `https://your-domain.com/mcp/sse`)
+* **Message Endpoint:** `POST http://<host>:8080/mcp/message?sessionId=<sessionId>`
+* **CORS:** Enabled (`Access-Control-Allow-Origin: *`) for browser-based AI agents.
 
-### Quick Start (Claude Desktop / Cursor)
+### 2. Local MCP over Stdio
+For local CLI or direct process invocation in Claude Desktop / Cursor:
 ```json
 {
   "mcpServers": {
@@ -141,6 +141,14 @@ VietCalendar includes a built-in **MCP Stdio Server** (`0.1.0-alpha`) for native
   }
 }
 ```
+
+### Tools Provided to AI Agents
+* `get_today_lunar`: Returns current solar & lunar date in Vietnam (UTC+7).
+* `convert_solar_to_lunar`: Converts solar date to Vietnamese lunar date.
+* `convert_lunar_to_solar`: Converts lunar date to solar date with leap month support.
+* `check_vietnam_holiday`: Checks Vietnam holidays and weekend compensatory leave.
+* `get_year_holidays`: Lists all public holidays and compensatory days for any year.
+
 For complete setup options, see **[`docs/mcp_setup.md`](docs/mcp_setup.md)**.
 
 ---
