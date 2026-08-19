@@ -688,6 +688,17 @@ pub async fn message_handler(
     }
 }
 
+/// POST /mcp/sse or POST /mcp: Direct HTTP JSON-RPC handler for modern MCP clients
+pub async fn direct_post_handler(
+    Json(req): Json<JsonRpcRequest>,
+) -> Response {
+    if let Some(resp) = handle_request(req) {
+        Json(resp).into_response()
+    } else {
+        StatusCode::NO_CONTENT.into_response()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

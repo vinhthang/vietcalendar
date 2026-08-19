@@ -130,8 +130,9 @@ async fn run_http_server(port_opt: Option<String>) {
             get(handlers::get_lunar_to_solar),
         )
         .route("/vietnam-holiday", get(handlers::check_vietnam_holiday))
-        .route("/mcp/sse", get(mcp::sse_handler))
+        .route("/mcp/sse", get(mcp::sse_handler).post(mcp::direct_post_handler))
         .route("/mcp/message", post(mcp::message_handler))
+        .route("/mcp", post(mcp::direct_post_handler))
         .with_state(mcp_session_manager)
         .layer(cors)
         .layer(TraceLayer::new_for_http());
