@@ -1,0 +1,9 @@
+# Declarative plugin overrides applied on top of config/cordis.yml (DeepSeek Harness style).
+# Example:
+# patches:
+#   - id: mcp_http
+#     enabled: false
+#   - id: http_server
+#     config:
+#       port: 9090
+patches: []

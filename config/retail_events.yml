@@ -1,0 +1,183 @@
+version: 1
+events:
+  - id: tet_nguyen_dan
+    name_vi: "Tết Nguyên Đán (Mùng 1 Tết)"
+    name_en: "Lunar New Year (Tết Day 1)"
+    lunar_month: 1
+    lunar_day: 1
+    day30_policy: last_day_of_month
+    leap_month_policy: primary_only
+    categories: [festival, shopping, family_gift, food_beverage]
+    prep_lead_days: 45
+    early_bird_lead_days: 21
+    campaign_focus_vi: "Giỏ quà Tết, áo dài, bánh kẹo, hoa tươi, lì xì và hàng gia dụng đón xuân."
+    campaign_focus_en: "Tết gift hampers, apparel, confectionery, flowers, lucky envelopes, and home refresh."
+
+  - id: ngay_via_than_tai
+    name_vi: "Ngày Vía Thần Tài"
+    name_en: "God of Wealth Day"
+    lunar_month: 1
+    lunar_day: 10
+    day30_policy: last_day_of_month
+    leap_month_policy: primary_only
+    categories: [religious, shopping, food_beverage]
+    prep_lead_days: 20
+    early_bird_lead_days: 10
+    campaign_focus_vi: "Vàng miếng, trang sức phong thủy, mâm cúng cá lóc nướng và bộ tam sên."
+    campaign_focus_en: "Gold bullion, lucky charms, roasted snakehead fish, and offering combos."
+
+  - id: tet_nguyen_tieu
+    name_vi: "Tết Nguyên Tiêu (Rằm Tháng Giêng)"
+    name_en: "First Full Moon Festival (Lantern Festival)"
+    lunar_month: 1
+    lunar_day: 15
+    day30_policy: last_day_of_month
+    leap_month_policy: primary_only
+    categories: [religious, festival, food_beverage]
+    prep_lead_days: 14
+    early_bird_lead_days: 7
+    campaign_focus_vi: "Đồ chay, trái cây ngũ quả, hoa cúng và dịch vụ mâm cúng Rằm lớn nhất năm."
+    campaign_focus_en: "Vegetarian cuisine, ceremonial fruit trays, temple flowers, and catering packages."
+
+  - id: tet_han_thuc
+    name_vi: "Tết Hàn Thực"
+    name_en: "Cold Food Festival (Bánh Trôi Nước)"
+    lunar_month: 3
+    lunar_day: 3
+    day30_policy: last_day_of_month
+    leap_month_policy: primary_only
+    categories: [food_beverage, family_gift]
+    prep_lead_days: 10
+    early_bird_lead_days: 5
+    campaign_focus_vi: "Bột nếp, đường phên, bánh trôi bánh chay ngũ sắc và nguyên liệu làm bánh tại nhà."
+    campaign_focus_en: "Glutinous rice flour, palm sugar, colorful bánh trôi/chay sets, and DIY dessert kits."
+
+  - id: gio_to_hung_vuong
+    name_vi: "Giỗ Tổ Hùng Vương"
+    name_en: "Hung Kings Commemoration Day"
+    lunar_month: 3
+    lunar_day: 10
+    day30_policy: last_day_of_month
+    leap_month_policy: primary_only
+    categories: [festival, family_gift, shopping]
+    prep_lead_days: 21
+    early_bird_lead_days: 10
+    campaign_focus_vi: "Du lịch nghỉ lễ ngắn ngày, bánh chưng bánh giầy, đồ dã ngoại và flash sale kỳ nghỉ."
+    campaign_focus_en: "Public holiday travel, outdoor gear, traditional cakes, and long-weekend retail promotions."
+
+  - id: phat_dan
+    name_vi: "Lễ Phật Đản"
+    name_en: "Vesak / Buddha's Birthday"
+    lunar_month: 4
+    lunar_day: 15
+    day30_policy: last_day_of_month
+    leap_month_policy: primary_only
+    categories: [religious, food_beverage]
+    prep_lead_days: 21
+    early_bird_lead_days: 7
+    campaign_focus_vi: "Ẩm thực chay thuần túy, hoa sen, đèn hoa đăng và vật phẩm Phật giáo."
+    campaign_focus_en: "Plant-based dining specials, lotus bouquets, floating lanterns, and temple offerings."
+
+  - id: tet_doan_ngo
+    name_vi: "Tết Đoan Ngọ (Mùng 5 Tháng 5)"
+    name_en: "Mid-Year Festival (Dragon Boat / Đoan Ngọ)"
+    lunar_month: 5
+    lunar_day: 5
+    day30_policy: last_day_of_month
+    leap_month_policy: primary_only
+    categories: [festival, food_beverage, family_gift]
+    prep_lead_days: 14
+    early_bird_lead_days: 7
+    campaign_focus_vi: "Cơm rượu nếp cẩm, bánh tro (bánh ú bá trạng), vải thiều, mận hậu và thịt vịt."
+    campaign_focus_en: "Fermented purple rice wine, ash-water dumplings, seasonal lychee/plum, and roast duck."
+
+  - id: that_tich
+    name_vi: "Lễ Thất Tịch"
+    name_en: "Thất Tịch (Vietnamese Qixi / Love Day)"
+    lunar_month: 7
+    lunar_day: 7
+    day30_policy: last_day_of_month
+    leap_month_policy: primary_only
+    categories: [shopping, food_beverage, family_gift]
+    prep_lead_days: 14
+    early_bird_lead_days: 7
+    campaign_focus_vi: "Chè đậu đỏ, trà sữa đậu đỏ, quà tặng cặp đôi, hoa tươi và chiến dịch giới trẻ."
+    campaign_focus_en: "Red bean desserts & drinks, couple gifts, flowers, and Gen-Z seasonal social campaigns."
+
+  - id: vu_lan_ram_thang_7
+    name_vi: "Lễ Vu Lan (Rằm Tháng Bảy)"
+    name_en: "Vu Lan Festival (Filial Piety & Wandering Souls)"
+    lunar_month: 7
+    lunar_day: 15
+    day30_policy: last_day_of_month
+    leap_month_policy: primary_only
+    categories: [religious, family_gift, food_beverage]
+    prep_lead_days: 25
+    early_bird_lead_days: 12
+    campaign_focus_vi: "Quà báo hiếu cha mẹ, sản phẩm chăm sóc sức khỏe người cao tuổi và mâm cúng Vu Lan."
+    campaign_focus_en: "Wellness gifts for parents, eldercare hampers, vegetarian feasts, and ceremonial supplies."
+
+  - id: trung_thu
+    name_vi: "Tết Trung Thu"
+    name_en: "Mid-Autumn Festival"
+    lunar_month: 8
+    lunar_day: 15
+    day30_policy: last_day_of_month
+    leap_month_policy: primary_only
+    categories: [festival, food_beverage, family_gift, shopping]
+    prep_lead_days: 45
+    early_bird_lead_days: 21
+    campaign_focus_vi: "Bánh Trung Thu biếu tặng doanh nghiệp, trà thượng hạng, lồng đèn và đồ chơi thiếu nhi."
+    campaign_focus_en: "Corporate & luxury mooncake gift boxes, specialty teas, lanterns, and children's toys."
+
+  - id: tet_trung_cuu
+    name_vi: "Tết Trùng Cửu"
+    name_en: "Double Ninth Festival"
+    lunar_month: 9
+    lunar_day: 9
+    day30_policy: last_day_of_month
+    leap_month_policy: primary_only
+    categories: [festival, family_gift]
+    prep_lead_days: 10
+    early_bird_lead_days: 5
+    campaign_focus_vi: "Trà hoa cúc, sản phẩm dưỡng sinh và ưu đãi chăm sóc sức khỏe mùa thu."
+    campaign_focus_en: "Chrysanthemum tea, herbal wellness items, and autumn elder-care gifting."
+
+  - id: tet_ha_nguyen
+    name_vi: "Tết Hạ Nguyên (Rằm Tháng Mười)"
+    name_en: "Lower Prime / New Rice Harvest Festival"
+    lunar_month: 10
+    lunar_day: 15
+    day30_policy: last_day_of_month
+    leap_month_policy: primary_only
+    categories: [religious, food_beverage]
+    prep_lead_days: 10
+    early_bird_lead_days: 5
+    campaign_focus_vi: "Gạo mới đặc sản, bánh ít bánh dày, hoa quả và đồ cúng tạ ơn mùa màng."
+    campaign_focus_en: "Fresh seasonal rice varieties, traditional sticky-rice cakes, and harvest offerings."
+
+  - id: ong_cong_ong_tao
+    name_vi: "Ngày Ông Công Ông Táo"
+    name_en: "Kitchen Gods Day"
+    lunar_month: 12
+    lunar_day: 23
+    day30_policy: last_day_of_month
+    leap_month_policy: primary_only
+    categories: [religious, shopping, food_beverage]
+    prep_lead_days: 21
+    early_bird_lead_days: 10
+    campaign_focus_vi: "Cá chép, bộ áo mũ Táo Quân, dịch vụ tổng vệ sinh cuối năm và cao điểm sắm Tết."
+    campaign_focus_en: "Carp offerings, Kitchen God sets, deep-cleaning home services, and Tết pre-peak surge."
+
+  - id: tat_nien_giao_thua
+    name_vi: "Tất Niên & Giao Thừa"
+    name_en: "Lunar New Year's Eve (Tất Niên)"
+    lunar_month: 12
+    lunar_day: 30
+    day30_policy: last_day_of_month
+    leap_month_policy: primary_only
+    categories: [festival, family_gift, food_beverage, shopping]
+    prep_lead_days: 30
+    early_bird_lead_days: 14
+    campaign_focus_vi: "Mâm cỗ Tất Niên đặt trước, gà luộc, bánh chưng bánh tét và giao hàng hỏa tốc cuối năm."
+    campaign_focus_en: "Pre-ordered reunion feasts, bánh chưng/tét, fresh groceries, and last-mile express delivery."

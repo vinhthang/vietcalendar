@@ -1,216 +1,150 @@
-# Architecture Decision Record (ADR): VietCalendar Rust Architecture & Refactoring
+# Architecture Decision Record (ADR): VietCalendar Rust Architecture & Cordis Plugin Redesign
 
-**Status:** Accepted & Implemented  
-**Date:** 2026-08-17  
-**Context:** Porting, stabilizing, and hardening the Vietnam Lunar Calendar API from Java 11 / Vert.x to Rust with Axum & Tokio.
+**Status:** Accepted & Implemented (`vietcalendar-rs` 0.2.0)
+
+**Date:** 2026-11-21 (Initial Rust Port: 2026-08-17)
+
+**Context:** Porting Vietnam Lunar Calendar from Java 11 / Vert.x to Rust (Axum & Tokio), followed by redesign into a clean, non-blocking, performance-focused Cordis-style plugin architecture.
 
 ---
 
 ## 1. Context and Problem Statement
 
-The Vietnam Lunar Calendar application was migrated from a Java Vert.x codebase to a modern Rust web application (`axum`, `tokio`, `utoipa`, `tracing`). During code review and testing, several critical domain modeling vulnerabilities, algorithmic flaws, and API inconsistencies were discovered:
+The Vietnam Lunar Calendar application originally migrated from Java Vert.x to Rust (`axum`, `tokio`, `utoipa`, `tracing`). Phase 1 resolved several domain and API correctness issues:
 
-1. **Gregorian / Lunar Date Incompatibility:** Attempting to store Lunar dates inside `chrono::NaiveDate` caused panics when lunar months contained 30 days in February (`NaiveDate::from_ymd_opt(y, 2, 30)` returns `None`).
-2. **Leap Month Algorithmic Flaw:** In `to_solar`, `leap = 1` was being passed for all 12 months in any leap year, causing non-leap months in leap years to return `(0, 0, 0)` and crash the server.
-3. **HTTP 200 OK Returned on Errors:** Axum handlers returning `Result<Json<T>, String>` serialized the `Err(String)` with HTTP status `200 OK` rather than `400 Bad Request`.
-4. **Incomplete Holiday Logic:** The holiday calculation lacked compensatory leave (nghỉ bù) when public holidays coincided with weekends, and did not properly account for Lunar New Year's Eve across lunar year boundaries.
-5. **Timezone Drift in `home` Endpoint:** Defaulting to server `Local::now()` resulted in UTC evaluation in Docker containers rather than Vietnam Indochina Time (UTC+7).
-6. **Docker Cache Invalidation:** Source and dependencies were built in a single step without caching pre-compiled crates.
+1. **Gregorian / Lunar Date Incompatibility:** Storing Lunar dates in `chrono::NaiveDate` panicked on 30-day lunar February (`TD` resolved via `LunarDate`).
+2. **Leap Month Algorithmic Flaw:** Passing `leap = 1` for all months in a leap year broke non-leap conversions.
+3. **HTTP 200 OK Returned on Errors:** Handler `Result<Json<T>, String>` serialized errors as `200 OK`.
+4. **Timezone Drift in `home` Endpoint:** Defaulting to `Local::now()` evaluated UTC inside containers instead of UTC+7.
+
+A subsequent architectural review identified remaining structural bottlenecks and baseline debt (`TD-01`–`TD-08` in [`docs/PROJECT_ANALYSIS.md`](PROJECT_ANALYSIS.md)):
+- Blocking `std::sync::RwLock<HashMap>` cloning entire `HashSet`s per request without timezone keys (`TD-02`), repeated Meeus trigonometry on every conversion, and silent day-30 rollover on 29-day *tháng thiếu* months (`TD-03`).
+- Monolithic route/MCP/telemetry wiring inside `src/main.rs` and `src/mcp.rs`, duplicated holiday logic omitting compensatory leave (`TD-01`), unbounded SSE channels (`TD-07`), and hardcoded pre-2021 holiday logic unable to express Vietnam's per-year workday swap decrees (*ngày đi làm bù*, `TD-05`).
 
 ---
 
 ## 2. Decision Drivers
 
-- **Reliability & Zero-Panic Guarantee:** Astronomical calculations and web requests must never crash the service on valid domain inputs.
-- **RESTful API Standards:** Strict conformance to HTTP status codes, structured JSON error responses, and OpenAPI 3.0 schema definitions.
-- **Cultural and Legal Accuracy:** Full fidelity with Vietnamese Labor Code regarding public holidays, Lunar New Year eve, and compensatory leave.
-- **Maintainability & Idiomatic Rust:** Strong typing, Serde case aliases, separation of astronomical math from HTTP transport.
-- **CI/CD & Container Performance:** Fast Docker layer caching and container security compliance (non-root execution).
+- **Non-Blocking Concurrency & Throughput:** Zero blocking locks on hot request paths; wait-free `ArcSwap` service/router/session snapshots, bounded `moka` W-TinyLFU caches, zero-alloc ISO date parsing, and bounded `mpsc::try_send` SSE backpressure.
+- **Cordis-Style Spatiotemporal Composability:** Decoupled plugins communicating strictly via `src/contracts/` Service Definitions (`CalendarService`, `HolidayService`, `HttpRouterService`, `McpRegistryService`), lifecycle-bound `Fiber` trees, and LIFO `EffectScope` disposers with live YAML profile/patch hot-reload.
+- **Data-Driven Legal Accuracy:** Exact per-year Vietnam MOLISA holiday tables (`config/holidays/<year>.yml`) supporting swapped working weekends (`working_weekends`), compensatory days, and bridge days.
+- **Zero-Panic Production Safety:** Zero `.unwrap()` / `.expect()` across production `src/` paths, graceful `SIGTERM`/`SIGINT` unwinding, and gated OpenTelemetry flushing.
 
 ---
 
 ## 3. Key Architectural Decisions
 
-### ADR-1: Dedicated Domain Model for Lunar Dates
-* **Decision:** Decouple Lunar dates from Gregorian calendar structures. Introduce [`LunarDate`](file:///c:/Users/thang/github/vietcalendar/src/models.rs#L14-L21) (`{ day: i32, month: i32, year: i32, is_leap: bool }`) in [`src/models.rs`](file:///c:/Users/thang/github/vietcalendar/src/models.rs).
-* **Rationale:** `chrono::NaiveDate` enforces Gregorian constraints (e.g. max 28/29 days in February, 30 in April). Lunar months are synodic and can have 30 days in any lunar month.
+### ADR-1 through ADR-11 (Historical Rust Port Decisions, 2026-08-17)
 
-### ADR-2: Independent `is_leap_month` Parameter in `to_solar`
-* **Decision:** Change `to_solar` signature to accept `(day, month, year, is_leap_month, time_zone)` in [`src/services.rs`](file:///c:/Users/thang/github/vietcalendar/src/services.rs#L27-L35).
-* **Rationale:** In the Vietnamese Luni-Solar calendar, a leap year (năm nhuận) contains one specific leap month (tháng nhuận). Only dates within that specific leap month should be converted with `leap = 1`.
+- **ADR-1 (`LunarDate` Domain Model):** Decoupled lunar dates from Gregorian `chrono::NaiveDate` via `LunarDate { day, month, year, is_leap }` (now in [`src/contracts/models.rs`](../src/contracts/models.rs)).
+- **ADR-2 (Independent `is_leap_month`):** Scoped leap-month conversion explicitly to `is_leap_month: bool` (now in [`src/contracts/calendar.rs`](../src/contracts/calendar.rs)).
+- **ADR-3 (`AppError` JSON Mapping):** Centralized `AppError` emitting `4xx`/`5xx` JSON [`ErrorResponse`](../src/contracts/models.rs) payloads (enhanced with `JsonQuery<T>` in [`src/plugins/http_server.rs`](../src/plugins/http_server.rs)).
+- **ADR-4 (Fixed Vietnam Timezone Anchor UTC+7):** Anchored `GET /` and `get_today_lunar` / `calendar://today` to `(Utc::now() + Duration::hours(7)).date_naive()`.
+- **ADR-5 (Dynamic Holiday & Compensatory Calculation):** Initial Rust port of holiday logic (superseded by **ADR-13** below).
+- **ADR-6 (Two-Stage Non-Root Docker Build):** Pre-compiles dependencies before copying sources and executes as non-root `appuser` (`UID 10001`) in [`Dockerfile`](../Dockerfile).
+- **ADR-7 (Symmetric ISO-8601 `/convert/.../{date}` Routes):** Standardized `/convert/solar-to-lunar/{date}` and `/convert/lunar-to-solar/{date}` alongside legacy `/lunar`.
+- **ADR-8 (Dual-Mode CLI & MCP Stdio Support):** Exposed `serve` and `mcp` modes (`vietcalendar` + `vietcalendar-mcp`).
+- **ADR-9 (Automated CI/CD & GHCR Publishing):** Enforced `fmt`, `clippy -D warnings`, `cargo test`, and GHCR publishing in [`.github/workflows/rust.yml`](../.github/workflows/rust.yml).
+- **ADR-10 (Dependency Modernization & Rust 1.97 Docker Toolchain):** Updated core framework dependencies (`axum 0.8.9`, `tokio 1.53.1`, `utoipa 5.5.0`, `clap 4.6.6`, etc.).
+- **ADR-11 (Remote MCP over HTTP/SSE + Direct HTTP POST + Permissive CORS):** Exposed `GET /mcp/sse`, `POST /mcp/message`, `POST /mcp`, and `POST /mcp/sse` with `CorsLayer` allowing `Any`.
 
-### ADR-3: Centralized Error Mapping via `AppError`
-* **Decision:** Implement custom error enum `AppError` (`BadRequest`, `NotFound`) implementing Axum's `IntoResponse` trait to emit `StatusCode::BAD_REQUEST` alongside [`ErrorResponse`](file:///c:/Users/thang/github/vietcalendar/src/handlers.rs#L11-L14) (`{ "error": "..." }`).
-* **Rationale:** Enforces correct HTTP 4xx status codes and consistent JSON structure across all API endpoints.
+---
 
-### ADR-4: Fixed Vietnam Timezone Anchor (UTC+7)
-* **Decision:** Explicitly calculate current date using `(Utc::now() + Duration::hours(7)).date_naive()` in [`src/handlers.rs`](file:///c:/Users/thang/github/vietcalendar/src/handlers.rs#L44-L53).
-* **Rationale:** Eliminates dependency on host machine timezone settings when deployed to cloud containers running in UTC.
+### ADR-12: Native Cordis-Style Non-Blocking Plugin Kernel (`src/kernel/`, `src/contracts/`, `src/plugins/`)
 
-### ADR-5: Compensatory Leave & Lunar New Year Eve Calculation
-* **Decision:** 
-  1. Lunar New Year Eve (Tất niên) is calculated dynamically as `to_solar(1, 1, ly) - 1 day`, correctly handling both 29-day (tháng thiếu) and 30-day (tháng đủ) 12th lunar months.
-  2. Public holidays that fall on a Saturday or Sunday dynamically generate compensatory holidays on the subsequent available business days.
-* **Rationale:** Satisfies real-world Vietnam legal requirements and un-ignores the full test suite.
+- **Decision:** Re-architect `vietcalendar-rs` around a zero-domain Cordis plugin kernel ([`src/kernel/`](../src/kernel/mod.rs)) paired with Three-Role Service Contracts ([`src/contracts/`](../src/contracts/mod.rs)), decoupled vertical plugins ([`src/plugins/`](../src/plugins/mod.rs)), and YAML Profiles/Patches ([`src/profiles/`](../src/profiles/mod.rs), [`config/cordis.yml`](../config/cordis.yml), [`config/cordis.patch.yml`](../config/cordis.patch.yml)):
+  1. **Wait-Free Hot Paths (`arc-swap` & `moka`):** `ServiceRegistry`, `HttpRouterEngine`, `McpCoreEngine`, and `McpSessionManager` publish immutable snapshots via `ArcSwap` for lock-free concurrent reads. `VietnamCalendarEngine` precomputes immutable `Arc<LunarSpan>` year layouts (giving O(1) conversions and strict 29/30-day lunar validation, resolving `TD-03`) cached in a bounded `moka::sync::Cache`, while replacing `is_solar_leap` with `CalendarService::is_lunar_leap_year` (`TD-04`).
+  2. **Reversible LIFO Effects & Reactive Dependency Graph:** Plugins declare `provides`/`requires` metadata, spawn cancellation-bound tasks (`ctx.spawn`), and register disposers (`ctx.on_dispose` / `ctx.effect`) that unwind strictly in LIFO order on disposal, failed mount, live patch reconciliation, or `SIGTERM`/`SIGINT` shutdown.
+  3. **Bounded Non-Blocking Streams & Live Hot-Reload:** `McpHttpPlugin` uses bounded `mpsc::channel` + `try_send` (`503` backpressure, `404` session validation on notifications, resolving `TD-07`), while `ConfigReloaderPlugin` bridges `notify` + Unix `SIGHUP` over a bounded debounced channel with atomic fail-safe YAML validation.
+  4. **Clean Break on Internal Rust API:** Legacy root modules (`calendar.rs`, `services.rs`, `handlers.rs`, `mcp.rs`, `models.rs`), `is_solar_leap`, `is_solar_holiday`, and `conf/configuration.json` are removed while preserving 100% HTTP REST and MCP protocol compatibility.
+- **Rationale:** Achieves DeepSeek Harness / Cordis modularity and live dynamic hot-swapping in safe, zero-`unsafe` native Rust without WASM FFI overhead or lock contention.
+- **Verification:** 23 unit tests, 6 end-to-end integration tests, `cargo bench` microbenchmarks, and static zero-`.unwrap()` / `-D warnings` audits (`docs/specs/2026-11-21-cordis-plugin-kernel/` and `docs/specs/2026-11-21-nonblocking-plugin-refactor/`).
 
-### ADR-6: Two-Stage Dockerfile with Dependency Pre-Building
-* **Decision:** Pre-compile dependencies using a skeleton `src/lib.rs` and `src/main.rs` before copying source code, and run container as non-root user `appuser` (UID 10001).
-* **Rationale:** Decreases Docker build times on code modifications from minutes to seconds and improves container security.
+### ADR-13: Data-Driven Per-Year Vietnam Holiday Schedules with `working_weekends` Overrides
 
-### ADR-7: Explicit Bidirectional Conversion Endpoints (`/convert/...`)
-* **Decision:** Replaced the legacy 8-digit path parameter route (`/lunar/{ddMMyyyy}`) with standardized, symmetric ISO-8601 conversion routes:
-  1. `GET /convert/solar-to-lunar/{date}`: Accepts ISO date string `YYYY-MM-DD` (e.g. `2015-09-12`).
-  2. `GET /convert/lunar-to-solar/{date}`: Accepts `YYYY-MM-DD` (where `YYYY`=lunar year, `MM`=lunar month, `DD`=lunar day) with optional query parameter `?leap=true/false` to handle leap months (tháng nhuận).
-* **Rationale:** 
-  - Standardizes RESTful path formats to international standard (ISO-8601), eliminating `DD-MM` vs `MM-DD` ambiguity.
-  - Provides full bidirectional conversion symmetry with explicit namespace clarity.
-  - Validates leap month constraints strictly.
+- **Decision:** Replaced hardcoded statutory holiday calculations in `services.rs` and the diverging duplicate `compute_holiday_list_for_year` in `mcp.rs` (`TD-01`, `TD-02`, `TD-05`) with a single `HolidayService` (`VietnamHolidaysPlugin` in [`src/plugins/holidays_vn/`](../src/plugins/holidays_vn/mod.rs)):
+  1. Loads per-year YAML files from [`config/holidays/`](../config/holidays/2026.yml) (`2024.yml`, `2025.yml`, `2026.yml` shipped with official MOLISA holiday, compensatory, bridge-day, and `working_weekends` swaps).
+  2. Evaluates dates against immutable `YearHolidaySchedule` binary-search vectors: `working_weekends` (*ngày đi làm bù*) return `false` even on Saturday/Sunday, configured `holiday_dates` return `true`, and otherwise `Sat`/`Sun` return `true`.
+  3. Unconfigured years fall back strictly to **weekends-only** (`Sat`/`Sun`), while plugins can overlay reversible per-year schedules via `HolidayService::register_year_schedule` (`moka` cache invalidated automatically on reload or disposer unwind).
+- **Rationale:** Real-world Vietnamese holidays change annually via government workday swap decrees that static formulas cannot reliably predict; sharing one `HolidayService` across HTTP and MCP eliminates drift (`TD-01`) and cache poisoning (`TD-02`).
 
-### ADR-8: Model Context Protocol (MCP) Server Support [Alpha]
-* **Decision:** Implemented JSON-RPC 2.0 stdio Model Context Protocol (MCP) server capabilities in [`src/mcp.rs`](file:///c:/Users/thang/github/vietcalendar/src/mcp.rs) and created a dual-mode CLI with `clap`:
-  - `vietcalendar serve`: Starts Axum HTTP REST web server.
-  - `vietcalendar mcp` / `vietcalendar-mcp`: Starts Alpha MCP stdio server exposing 5 tools (`get_today_lunar`, `convert_solar_to_lunar`, `convert_lunar_to_solar`, `check_vietnam_holiday`, `get_year_holidays`) and 2 resources (`calendar://today`, `calendar://holidays/{year}`).
-* **Rationale:** Enables direct, native integration with modern AI developer tools (Antigravity, Claude Desktop, Cursor, VS Code) while preserving 100% of the production HTTP web server functionality.
+### ADR-14: Shared `canchi_solar_vn` Substrate & Decoupled Thin Niche Plugins (`REQ-036..REQ-038, REQ-041` / `ADR-011`)
 
-### ADR-9: Automated CI/CD Container Publishing to GHCR (`ghcr.io`) & Legacy Cleanup
-* **Decision:**
-  1. Configured automated GitHub Actions workflow in [`.github/workflows/rust.yml`](file:///c:/Users/thang/github/vietcalendar/.github/workflows/rust.yml) triggered on pushes to `master`, `main`, and `rust-port`.
-  2. The workflow performs:
-     - Strict static analysis (`cargo fmt --check`, `cargo clippy -- -D warnings`).
-     - Automated test suite execution across unit and integration tests.
-     - Multi-stage Docker image build using GitHub Actions cache (`type=gha`).
-     - Automatic publication to **GitHub Container Registry (`ghcr.io/vinhthang/vietcalendar:latest`)**.
-  3. Completely removed legacy Java 11, Maven (`pom.xml`, `mvnw`), and RAML assets from `master`, establishing a pure Rust single-binary repository.
-* **Rationale:**
-  - Provides zero-cost, zero-billing cloud container distribution.
-  - Guarantees that any server or local AI assistant (Antigravity, Claude Desktop, Cursor) can instantly pull and run the latest verified container without local compilation toolchains.
-  - Docker cache layer invalidation guarantees consistent incremental build speeds under 60 seconds in CI.
+- **Decision:** Extracted Can Chi (`year`, `month` *Ngũ Hổ Độn*, JDN `day`, `hour` *Ngũ Thử Độn*, 30 *Nạp Âm*) and AA98 24 Solar Terms (*Tiết Khí*) into a shared [`CanChiSolarService`](../src/contracts/canchi.rs) (`canchi_solar_vn`), consumed uniformly by [`AstrologyPlugin`](../src/plugins/astrology_vn/mod.rs) (BaZi Four Pillars + Vietnamese Tử Vi Nam Phái Core ~50 stars), [`TrachNhatPlugin`](../src/plugins/trach_nhat_vn/mod.rs), [`http_niches`](../src/plugins/http_niches.rs), and [`mcp_niches`](../src/plugins/mcp_niches.rs) with bilingual `(id, name_vi, name_en)` DTOs.
+- **Rationale:** Prevents astronomical calculation drift across niches, allows independent enable/disable of each niche via [`config/cordis.yml`](../config/cordis.yml) / [`config/cordis.patch.yml`](../config/cordis.patch.yml), and ensures Cordis LIFO dependency disposal cascades cleanly when any niche plugin is unmounted.
 
+### ADR-15: Wait-Free Niche Caching, Stateless Recurrence, & Hot-Reloadable Retail Catalog (`REQ-039..REQ-040` / `ADR-012`)
 
-### ADR-10: Dependency Modernization and Rust 1.97 Toolchain Upgrade
-* **Decision:**
-  1. Upgraded Rust compilation toolchain in `Dockerfile` and developer guidelines from Rust 1.94 to **Rust 1.97**.
-  2. Updated all core runtime and framework dependencies to their latest compatible releases:
-     - `tokio`: `1.43.0` -> `1.53.1`
-     - `axum`: `0.8.8` -> `0.8.9`
-     - `serde`: `1.0.217` -> `1.0.229`
-     - `serde_json`: `1.0.138` -> `1.0.151`
-     - `chrono`: `0.4.39` -> `0.4.45`
-     - `tracing`: `0.1.41` -> `0.1.44`
-     - `tracing-subscriber`: `0.3.19` -> `0.3.23`
-     - `tower-http`: `0.6.2` -> `0.6.11`
-     - `utoipa`: `5.3.1` -> `5.5.0`
-     - `utoipa-swagger-ui`: `9.0.0` -> `9.0.2`
-     - `clap`: `4.5.30` -> `4.6.6`
-* **Rationale:**
-  - Incorporates latest security patches, performance improvements, and bug fixes across all asynchronous runtime, serialization, and web transport layers.
-  - Keeps OpenAPI generator (`utoipa`) and Swagger UI aligned with recent schema rendering enhancements.
-### ADR-11: Public Remote MCP over HTTP/SSE Transport with Permissive CORS
-* **Decision:**
-  1. Implemented official Model Context Protocol (MCP) Server-Sent Events (SSE) remote transport:
-     - `GET /mcp/sse`: Generates a unique UUID session, registers client channel in `McpSessionManager`, and emits the initial `endpoint` event (`event: endpoint\ndata: /mcp/message?sessionId=<uuid>`).
-     - `POST /mcp/message?sessionId=<uuid>`: Receives JSON-RPC 2.0 requests and pushes responses asynchronously back to the matching client's SSE stream as `event: message`.
-  2. Enabled permissive Cross-Origin Resource Sharing (CORS) using `tower_http::cors::CorsLayer::permissive()` allowing all headers, origins, and methods.
-  3. Preserved full dual-transport capability: `vietcalendar serve` exposes both HTTP REST API and remote MCP SSE, while `vietcalendar-mcp` provides standalone `stdio` mode for local CLI pairing.
-* **Rationale:**
-  - Enables public internet access for remote AI clients (Claude Desktop, Cursor, ChatGPT plugins, web-based agents) with zero-configuration friction.
-  - Keeps all transport routing native in the single Axum binary without requiring external sidecar proxies or secondary ports.
+- **Decision:**
+  1. Cached 24 Solar Terms per `(year, tz_quarters)` inside a bounded `moka::sync::Cache` (capacity 256) in [`solar_terms.rs`](../src/plugins/canchi_solar_vn/solar_terms.rs).
+  2. Implemented [`LunarRecurrencePlugin`](../src/plugins/recurrence_vn/mod.rs) strictly stateless (`<= 50` years) resolving `Day30Policy` (`Skip`/`LastDayOfMonth`), `LeapMonthPolicy`, and folded CRLF RFC 5545 `.ics` feeds with `VALARM`.
+  3. Built [`RetailCalendarPlugin`](../src/plugins/retail_vn/mod.rs) atop `ArcSwap<RetailCatalog>`, strict `serde_yaml_ng` (`deny_unknown_fields`) validation on [`config/retail_events.yml`](../config/retail_events.yml) (14 peaks + algorithmic `monthly_mung_1_ram`), and atomic staging/commit inside [`ConfigReloaderPlugin`](../src/plugins/config_reloader.rs).
+- **Rationale:** Keeps all request hot paths lock-free with zero server-side state corruption risk while maintaining hot-reload parity between holidays and retail campaigns.
 
 ---
 
 ## 4. Architecture Diagram
 
 ```mermaid
-graph TD
-    HttpClient[HTTP Client / Frontend] -->|HTTP REST| Router[Axum Router]
-    AiClient[AI Assistant / Antigravity / Claude] -->|JSON-RPC 2.0 stdio| McpServer[MCP Engine (src/mcp.rs)]
-    
-    subgraph "API & Transport Layer (src/handlers.rs, src/main.rs, src/mcp.rs)"
-        Router -->|/swagger-ui| Swagger[OpenAPI / Swagger UI]
-        Router -->|/| HomeHandler[home()]
-        Router -->|/lunar| LunarQueryHandler[get_lunar()]
-        Router -->|/convert/solar-to-lunar/:date| SolarToLunarHandler[get_solar_to_lunar()]
-        Router -->|/convert/lunar-to-solar/:date| LunarToSolarHandler[get_lunar_to_solar()]
-        Router -->|/vietnam-holiday| HolidayHandler[check_vietnam_holiday()]
-        
-        McpServer -->|Tool: get_today_lunar| McpToday[get_today_lunar]
-        McpServer -->|Tool: convert_solar_to_lunar| McpSolarToLunar[convert_solar_to_lunar]
-        McpServer -->|Tool: convert_lunar_to_solar| McpLunarToSolar[convert_lunar_to_solar]
-        McpServer -->|Tool: check_vietnam_holiday| McpHoliday[check_vietnam_holiday]
-        McpServer -->|Tool: get_year_holidays| McpYearHolidays[get_year_holidays]
-        McpServer -->|Resource: calendar://today| McpResToday[calendar://today]
-        McpServer -->|Resource: calendar://holidays/:year| McpResHolidays[calendar://holidays/:year]
+flowchart TD
+    Config["config/cordis.yml + cordis.patch.yml + holidays/*.yml"] -->|Boot & notify/SIGHUP| Profiles["src/profiles/ + ConfigReloaderPlugin"]
+    Profiles -->|reconcile| Kernel["Cordis Kernel (src/kernel/): Fiber Tree + ArcSwap Registry + LIFO EffectScope"]
 
-        LunarQueryHandler -.->|Error| AppError[AppError -> StatusCode 400 + JSON]
-        SolarToLunarHandler -.->|Error| AppError
-        LunarToSolarHandler -.->|Error| AppError
-        HolidayHandler -.->|Error| AppError
+    subgraph "Service Contracts (src/contracts/)"
+        CalSvc["CalendarService"]
+        HolSvc["HolidayService"]
+        HttpSvc["HttpRouterService"]
+        McpSvc["McpRegistryService"]
     end
-    
-    subgraph "Domain & Services Layer (src/services.rs, src/models.rs)"
-        HomeHandler --> ServiceToLunar[to_lunar]
-        LunarQueryHandler --> ServiceToLunar
-        SolarToLunarHandler --> ServiceToLunar
-        LunarToSolarHandler --> ServiceToSolar[to_solar]
-        HolidayHandler --> ServiceHoliday[is_vietnam_holiday]
-        
-        McpToday --> ServiceToLunar
-        McpSolarToLunar --> ServiceToLunar
-        McpLunarToSolar --> ServiceToSolar
-        McpHoliday --> ServiceHoliday
-        McpYearHolidays --> ServiceHolidayList[get_vietnam_holidays_for_year]
-        McpResToday --> ServiceToLunar
-        McpResHolidays --> ServiceHolidayList
-        
-        ServiceToLunar --> DomainLunar[models::LunarDate]
-        ServiceToSolar --> DomainSolar[chrono::NaiveDate]
-        ServiceHoliday --> HolidayEngine[Vietnam Holiday & Compensatory Engine]
-        ServiceHolidayList --> HolidayEngine
-    end
-    
-    subgraph "Astronomical Algorithms (src/calendar.rs)"
-        ServiceToLunar --> AstroMath[Jean Meeus AA98 Algorithms]
-        ServiceToSolar --> AstroMath
-        ServiceHoliday --> AstroMath
-        HolidayEngine --> AstroMath
+
+    Kernel -.->|provides / injects wait-free| CalSvc & HolSvc & HttpSvc & McpSvc
+
+    subgraph "Vertical Plugins (src/plugins/)"
+        CalPlug["calendar_vn (moka Arc<LunarSpan>)"] --> CalSvc
+        HolPlug["holidays_vn (ArcSwap + moka YearHolidaySchedule)"] --> HolSvc
+        HttpSrv["http_server (DynamicRouterService + ArcSwap<Router/OpenApi>)"] --> HttpSvc
+        HttpCal["http_calendar (/, /lunar, /convert/*)"] -->|injects| CalSvc & HttpSvc
+        HttpHol["http_holidays (/vietnam-holiday)"] -->|injects| HolSvc & HttpSvc
+        OpenApi["openapi (/swagger-ui, /api-docs/openapi.json)"] -->|injects| HttpSvc
+        McpCore["mcp_core (ArcSwap tool/resource dispatch)"] --> McpSvc
+        McpTools["mcp_tools (5 tools, calendar://today, calendar://holidays/{year})"] -->|injects| CalSvc & HolSvc & McpSvc
+        McpHttp["mcp_http (/mcp/sse, /mcp/message, /mcp bounded try_send)"] -->|injects| McpSvc & HttpSvc
+        McpStdio["mcp_stdio (cancellation-aware stdin/stdout)"] -->|injects| McpSvc
+        Telemetry["telemetry (gated OTLP + shutdown flush)"]
     end
 ```
 
 ---
 
-## 5. Implementation Summary & Verification Walkthrough
+## 5. Module Map & Verification Matrix
 
-### Code Changes Across Modules
-
-| File | Change Description |
+| Module | Role |
 | :--- | :--- |
-| [`src/models.rs`](file:///c:/Users/thang/github/vietcalendar/src/models.rs) | Added `LunarDate`, updated `DateMonthYear` with `leap: Option<bool>` and Serde casing aliases, with unit tests. |
-| [`src/services.rs`](file:///c:/Users/thang/github/vietcalendar/src/services.rs) | Implemented safe `to_lunar`, fixed `to_solar` leap month bug, added weekend compensatory holiday logic, with unit tests. |
-| [`src/handlers.rs`](file:///c:/Users/thang/github/vietcalendar/src/handlers.rs) | Added `AppError`, `ErrorResponse`, strongly typed queries, `/convert/solar-to-lunar/{date}` and `/convert/lunar-to-solar/{date}` handlers, with unit tests. |
-| [`src/mcp.rs`](file:///c:/Users/thang/github/vietcalendar/src/mcp.rs) | Implemented JSON-RPC 2.0 stdio MCP server exposing 5 tools, 2 resources, and unit test suite. |
-| [`src/bin/vietcalendar-mcp.rs`](file:///c:/Users/thang/github/vietcalendar/src/bin/vietcalendar-mcp.rs) | Standalone binary target for dedicated MCP Stdio mode. |
-| [`src/main.rs`](file:///c:/Users/thang/github/vietcalendar/src/main.rs) | Added `clap` CLI dual mode (`serve` vs `mcp`), registered conversion routes in Axum router and OpenAPI 3.0 specs. |
-| [`src/calendar.rs`](file:///c:/Users/thang/github/vietcalendar/src/calendar.rs) | Astronomical Julian and lunar math, non-leap year validation in `convert_lunar_to_solar`, with unit tests. |
-| [`tests/integration_test.rs`](file:///c:/Users/thang/github/vietcalendar/tests/integration_test.rs) | Updated assertions to use `LunarDate`, un-ignored `test_holiday`, added roundtrip conversion tests. |
-| [`Dockerfile`](file:///c:/Users/thang/github/vietcalendar/Dockerfile) | Optimized with multi-stage cargo dependency caching, `touch` cache invalidation, and added non-root unprivileged `appuser`. |
-| [`.github/workflows/rust.yml`](file:///c:/Users/thang/github/vietcalendar/.github/workflows/rust.yml) | Automated CI/CD workflow running fmt, clippy, tests, and publishing Docker images to `ghcr.io/vinhthang/vietcalendar:latest`. |
+| [`src/kernel/`](../src/kernel/mod.rs) | Zero-domain Cordis kernel: `Kernel`, `Context`, `Fiber`, `EffectScope` (LIFO), `ServiceRegistry` (`ArcSwap`), `EventBus`, YAML `reconcile`. |
+| [`src/contracts/`](../src/contracts/mod.rs) | Trait seams (`CalendarService`, `HolidayService`, `HttpRouterService`, `McpRegistryService`) and DTOs (`DateMonthYear`, `LunarDate`, `YearHolidaySchedule`, `ErrorResponse`). |
+| [`src/plugins/calendar_vn/`](../src/plugins/calendar_vn/mod.rs) | Meeus AA98 math + `moka`-cached `Arc<LunarSpan>`, strict 29/30-day validation (`TD-03`), exact `is_lunar_leap_year` (`TD-04`). |
+| [`src/plugins/holidays_vn/`](../src/plugins/holidays_vn/mod.rs) | Non-blocking async YAML loader + `ArcSwap`/`moka` `HolidayService` (`working_weekends` + weekends-only fallback, `TD-01`/`TD-02`/`TD-05`). |
+| [`src/plugins/canchi_solar_vn/`](../src/plugins/canchi_solar_vn/mod.rs) | Shared JDN Can Chi, Ngũ Hổ Độn, Ngũ Thử Độn, 30 Nạp Âm, and `moka`-cached 24 Tiết Khí solver. |
+| [`src/plugins/astrology_vn/`](../src/plugins/astrology_vn/mod.rs) | BaZi Four Pillars (*Lập Xuân*/*Tiết Khí* splits, Hidden Stems, Ten Gods, Đại Vận) + Tử Vi Nam Phái Core (~50 stars, 12 palaces). |
+| [`src/plugins/trach_nhat_vn/`](../src/plugins/trach_nhat_vn/mod.rs) | Hoàng Đạo hours/days, 12 Trực, 28 Tú, major taboos, Tam Tai/Kim Lâu/Hoang Ốc/Xung Tuổi age checks, `<= 366`-day search. |
+| [`src/plugins/recurrence_vn/`](../src/plugins/recurrence_vn/mod.rs) | Stateless `<= 50`-year lunar recurrence with `Day30Policy`/`LeapMonthPolicy`, presets, and CRLF `<= 75`-octet `.ics` export. |
+| [`src/plugins/retail_vn/`](../src/plugins/retail_vn/mod.rs) | Wait-free `ArcSwap` retail engine over strictly validated `config/retail_events.yml` (14 peaks + monthly Mùng 1/Rằm). |
+| [`src/plugins/http_*.rs`](../src/plugins/http_server.rs) | Wait-free `DynamicRouterService`, `JsonQuery<T>`/`AppJson<T>`, zero-alloc `parse_ymd_ascii`, 5 niche HTTP/OpenAPI plugins (10 routes). |
+| [`src/plugins/mcp_*.rs`](../src/plugins/mcp_core.rs) | Lock-free `McpCoreEngine`, 5 core + 11 niche MCP tools, 3 resource templates, cancellation-aware `stdio`, bounded `try_send` SSE. |
+| [`src/plugins/config_reloader.rs`](../src/plugins/config_reloader.rs) | Debounced bounded-channel `notify` + `SIGHUP` fail-safe YAML hot-reload. |
+| [`src/plugins/telemetry.rs`](../src/plugins/telemetry.rs) | Idempotent `tracing` subscriber, gated OTLP gRPC exporter, LIFO `TracerProvider::shutdown()`. |
+| [`src/profiles/mod.rs`](../src/profiles/mod.rs) | YAML profile (`serve`, `mcp-stdio`, `http-only`) and patch reconciler with embedded fallback defaults. |
+| [`tests/integration_test.rs`](../tests/integration_test.rs) | End-to-end profile boot, live unmount, HTTP `oneshot`, OpenAPI, MCP direct/SSE backpressure (`503`/`404`), and hot-reload tests. |
+| [`benches/calendar_bench.rs`](../benches/calendar_bench.rs) | Criterion microbenchmarks for warm/cold conversions, holiday checks, ASCII date parse, and wait-free kernel injection. |
 
 ### Verification Matrix
 
-| Area | Verification Test | Expected Output | Status |
+| Area | Verification Test / Target | Expected Outcome | Status |
 | :--- | :--- | :--- | :---: |
-| **Solar to Lunar (ISO Path)** | `test_get_solar_to_lunar_endpoint` | Converts `YYYY-MM-DD` to `LunarDate` output | Passed |
-| **Lunar to Solar (Path & Leap)** | `test_get_lunar_to_solar_endpoint` | Converts lunar date to solar date with `?leap=true/false` support | Passed |
-| **Solar to Lunar (Query Params)** | `test_get_lunar_handler` | Parses query parameters and returns `DateMonthYear` | Passed |
-| **Julian Day Calculations** | `test_jd_roundtrip` | Accurate across Gregorian reform (1582) and modern centuries | Passed |
-| **Roundtrip Math** | `test_roundtrip_conversion` | `to_solar(to_lunar(d)) == d` | Passed |
-| **Compensatory Holidays** | `test_holiday`, `test_vietnam_holidays_with_compensatory` | 2011-04-30 (Sat) & 2011-05-01 (Sun) shift to 2011-05-02 (Mon) & 2011-05-03 (Tue) | Passed |
-| **Error Handling** | `test_app_error_into_response`, invalid input tests | Returns HTTP 400 with `{ "error": "..." }` | Passed |
-| **Domain Serde** | `test_date_month_year_serde`, `test_lunar_date_serde` | Supports `"MM"` and `"mm"` case aliases, skips None `leap` field | Passed |
-| **MCP Protocol Handshake** | `test_mcp_initialize` | Advertises `vietcalendar-mcp 0.1.0-alpha (experimental)` version `2024-11-05` | Passed |
-| **MCP Tools Listing** | `test_mcp_tools_list` | Returns 5 registered tool definitions with input JSON schemas | Passed |
-| **MCP Tool Calls** | `test_mcp_convert_solar_to_lunar_call`, `test_mcp_convert_lunar_to_solar_call` | Executes astronomical conversions over JSON-RPC 2.0 stdio | Passed |
-| **MCP Resources** | `test_mcp_resources` | Resolves `calendar://today` and `calendar://holidays/{year}` snapshots | Passed |
-| **Container Publishing** | GitHub Actions Workflow on `master` | Successfully builds and publishes to `ghcr.io/vinhthang/vietcalendar:latest` | Passed |
-
-
+| **Cordis Kernel** | `kernel::tests::*` (6 unit tests) | LIFO effects, `ctx.fork` teardown, out-of-order mount, cycles, failed rollback, patch reconcile | Passed |
+| **15,000-Day Equivalence & Validation** | `plugins::calendar_vn::tests::*` (5 tests) | 15k-day AA98 match across 3 timezones, strict day-30 rejection, exact `is_lunar_leap_year` | Passed |
+| **Data-Driven Holidays & Overrides** | `plugins::holidays_vn::tests::*` (3 tests) | 2024–2026 MOLISA holidays + swapped working Saturdays, `2099` fallback, reversible override | Passed |
+| **HTTP / OpenAPI / Live Unmount** | `test_http_rest_endpoints_end_to_end`, `test_live_plugin_unmount_*` | 5 REST routes, `JsonQuery` 400 JSON, no unused `LunarDate` schema, live unmount -> 404 | Passed |
+| **MCP Tools, Templates & Bounded SSE** | `test_mcp_http_*`, `test_mcp_sse_*`, `vietcalendar-mcp` CLI | `get_year_holidays(2026)` parity, `404` unknown notification, `503` SSE backpressure | Passed |
+| **Live YAML Hot-Reload** | `test_live_yaml_hot_reload_and_malformed_rollback` | `notify` auto-reloads `2031.yml` & patch; malformed YAML retains prior state | Passed |
+| **Zero-Panic & Lint Safety** | `RUSTFLAGS="-D warnings"`, prod `.unwrap()` scan, `src/kernel/` isolation | 0 warnings, 0 production `.unwrap()`/`.expect()`, 0 domain imports in `kernel` | Passed |

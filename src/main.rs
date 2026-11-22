@@ -1,168 +1,149 @@
-use axum::{
-    routing::{get, post},
-    Router,
-};
+//! `vietcalendar` dual-mode CLI binary booting Cordis profiles (`serve` or `mcp`).
+
+use std::path::PathBuf;
+use std::process::ExitCode;
+
 use clap::{Parser, Subcommand};
-use std::env;
-use std::sync::Arc;
-
-use opentelemetry::global;
-use opentelemetry::trace::TracerProvider as _;
-use tower_http::cors::{Any, CorsLayer};
-use tower_http::trace::TraceLayer;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use utoipa::OpenApi;
-use utoipa_swagger_ui::SwaggerUi;
-
-use vietcalendar_rs::handlers;
-use vietcalendar_rs::mcp;
-use vietcalendar_rs::models;
-
-#[derive(OpenApi)]
-#[openapi(
-    info(
-        title = "Vietnam Lunar Calendar API",
-        version = "0.1.0",
-        description = "API for Lunar and Solar dates."
-    ),
-    paths(
-        handlers::home,
-        handlers::get_lunar,
-        handlers::get_solar_to_lunar,
-        handlers::get_lunar_to_solar,
-        handlers::check_vietnam_holiday
-    ),
-    components(schemas(models::DateMonthYear, models::LunarDate, handlers::ErrorResponse))
-)]
-struct ApiDoc;
-
-use opentelemetry_sdk::trace::TracerProvider;
+use vietcalendar_rs::kernel::Kernel;
+use vietcalendar_rs::plugins::mcp_stdio::StdioExitSignal;
+use vietcalendar_rs::profiles::{boot_profile, resolve_config_dir};
 
 #[derive(Parser)]
 #[command(
     name = "vietcalendar",
     about = "Vietnam Lunar Calendar Service & MCP Server",
-    version = "0.1.0"
+    version = env!("CARGO_PKG_VERSION")
 )]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 
-    #[arg(short, long, env = "PORT")]
-    port: Option<String>,
+    /// Optional HTTP port override (falls back to YAML port, $PORT, $HTTP_PORT, or 8080).
+    #[arg(short, long)]
+    port: Option<u16>,
+
+    /// Path to the YAML configuration directory (default: $VIETCALENDAR_CONFIG_DIR or ./config).
+    #[arg(long, env = "VIETCALENDAR_CONFIG_DIR")]
+    config_dir: Option<PathBuf>,
+
+    /// Cordis profile name to boot from cordis.yml.
+    #[arg(long)]
+    profile: Option<String>,
 }
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Start the Axum HTTP REST API Web Server (default)
+    /// Start the non-blocking HTTP REST API + Remote MCP SSE server (default)
     Serve {
-        #[arg(short, long, env = "PORT")]
-        port: Option<String>,
+        /// Optional HTTP port override (overrides YAML port and env vars).
+        #[arg(short, long)]
+        port: Option<u16>,
+        /// Path to the YAML configuration directory.
+        #[arg(long, env = "VIETCALENDAR_CONFIG_DIR")]
+        config_dir: Option<PathBuf>,
+        /// Cordis profile name (default: "serve").
+        #[arg(long)]
+        profile: Option<String>,
     },
-    /// Start the Model Context Protocol (MCP) Stdio Server [Alpha]
-    Mcp,
+    /// Start the Model Context Protocol (MCP) Stdio Server
+    Mcp {
+        /// Path to the YAML configuration directory.
+        #[arg(long, env = "VIETCALENDAR_CONFIG_DIR")]
+        config_dir: Option<PathBuf>,
+        /// Cordis profile name (default: "mcp-stdio").
+        #[arg(long)]
+        profile: Option<String>,
+    },
 }
 
-fn init_telemetry() {
-    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| "info,vietcalendar_rs=debug,tower_http=debug".into());
-
-    let exporter = match opentelemetry_otlp::SpanExporter::builder()
-        .with_tonic()
-        .build()
+async fn wait_for_shutdown_signal() {
+    #[cfg(unix)]
     {
-        Ok(e) => Some(e),
-        Err(e) => {
-            eprintln!("Failed to build otlp exporter: {:?}", e);
-            None
+        let mut sigterm =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()).ok();
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {}
+            _ = async {
+                if let Some(ref mut s) = sigterm {
+                    s.recv().await;
+                } else {
+                    std::future::pending::<()>().await;
+                }
+            } => {}
         }
-    };
-
-    if let Some(exporter) = exporter {
-        let provider = TracerProvider::builder()
-            .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
-            .build();
-        global::set_tracer_provider(provider.clone());
-        let tracer = provider.tracer("vietcalendar-rs");
-
-        let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
-
-        tracing_subscriber::registry()
-            .with(env_filter)
-            .with(tracing_subscriber::fmt::layer())
-            .with(telemetry)
-            .init();
-    } else {
-        tracing_subscriber::registry()
-            .with(env_filter)
-            .with(tracing_subscriber::fmt::layer())
-            .init();
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = tokio::signal::ctrl_c().await;
     }
 }
 
-async fn run_http_server(port_opt: Option<String>) {
-    init_telemetry();
+async fn run_serve(config_dir: PathBuf, profile: String, port: Option<u16>) -> Result<(), String> {
+    let kernel: Kernel = boot_profile(&config_dir, &profile, port, None)
+        .await
+        .map_err(|e| format!("failed to boot profile '{profile}': {e}"))?;
 
-    let port = port_opt
-        .or_else(|| env::var("PORT").ok())
-        .or_else(|| env::var("HTTP_PORT").ok())
-        .unwrap_or_else(|| "8080".to_string());
+    wait_for_shutdown_signal().await;
+    kernel.shutdown().await;
+    Ok(())
+}
 
-    let addr = format!("0.0.0.0:{}", port);
+async fn run_mcp(config_dir: PathBuf, profile: String) -> Result<(), String> {
+    let kernel: Kernel = boot_profile(&config_dir, &profile, None, None)
+        .await
+        .map_err(|e| format!("failed to boot profile '{profile}': {e}"))?;
 
-    let mcp_session_manager = Arc::new(mcp::McpSessionManager::new());
+    if let Some(exit_sig) = kernel.inject::<StdioExitSignal>() {
+        tokio::select! {
+            _ = exit_sig.notified() => {}
+            _ = wait_for_shutdown_signal() => {}
+        }
+    } else {
+        wait_for_shutdown_signal().await;
+    }
 
-    let cors = CorsLayer::new()
-        .allow_methods(Any)
-        .allow_origin(Any)
-        .allow_headers(Any);
-
-    let app = Router::new()
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
-        .route("/", get(handlers::home))
-        .route("/lunar", get(handlers::get_lunar))
-        .route(
-            "/convert/solar-to-lunar/{date}",
-            get(handlers::get_solar_to_lunar),
-        )
-        .route(
-            "/convert/lunar-to-solar/{date}",
-            get(handlers::get_lunar_to_solar),
-        )
-        .route("/vietnam-holiday", get(handlers::check_vietnam_holiday))
-        .route(
-            "/mcp/sse",
-            get(mcp::sse_handler).post(mcp::direct_post_handler),
-        )
-        .route("/mcp/message", post(mcp::message_handler))
-        .route("/mcp", post(mcp::direct_post_handler))
-        .with_state(mcp_session_manager)
-        .layer(cors)
-        .layer(TraceLayer::new_for_http());
-
-    tracing::info!("Listening on http://{}", addr);
-    tracing::info!("Swagger UI at http://{}/swagger-ui", addr);
-    tracing::info!("Remote MCP SSE endpoint at http://{}/mcp/sse", addr);
-
-    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    kernel.shutdown().await;
+    Ok(())
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> ExitCode {
     let cli = Cli::parse();
 
-    match cli.command {
-        Some(Commands::Mcp) => {
-            if let Err(e) = mcp::run_stdio_server().await {
-                eprintln!("MCP server error: {}", e);
-            }
+    let result = match cli.command {
+        Some(Commands::Mcp {
+            config_dir,
+            profile,
+        }) => {
+            let dir = resolve_config_dir(config_dir.or(cli.config_dir));
+            let prof = profile
+                .or(cli.profile)
+                .unwrap_or_else(|| "mcp-stdio".to_string());
+            run_mcp(dir, prof).await
         }
-        Some(Commands::Serve { port }) => {
-            run_http_server(port.or(cli.port)).await;
+        Some(Commands::Serve {
+            port,
+            config_dir,
+            profile,
+        }) => {
+            let dir = resolve_config_dir(config_dir.or(cli.config_dir));
+            let prof = profile
+                .or(cli.profile)
+                .unwrap_or_else(|| "serve".to_string());
+            run_serve(dir, prof, port.or(cli.port)).await
         }
         None => {
-            run_http_server(cli.port).await;
+            let dir = resolve_config_dir(cli.config_dir);
+            let prof = cli.profile.unwrap_or_else(|| "serve".to_string());
+            run_serve(dir, prof, cli.port).await
+        }
+    };
+
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(err) => {
+            eprintln!("vietcalendar error: {err}");
+            ExitCode::FAILURE
         }
     }
 }

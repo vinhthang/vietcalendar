@@ -1,16 +1,33 @@
 [package]
 name = "vietcalendar-rs"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 [dependencies]
 axum = "0.8.9"
-tokio = { version = "1.53.1", features = ["full"] }
+tokio = { version = "1.53.1", features = [
+    "rt-multi-thread",
+    "macros",
+    "net",
+    "io-std",
+    "io-util",
+    "sync",
+    "signal",
+    "time",
+    "fs",
+] }
+tokio-util = { version = "0.7", features = ["rt"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
+serde_yaml_ng = "0.10"
 chrono = { version = "0.4.45", features = ["serde"] }
+arc-swap = "1"
+moka = { version = "0.12", features = ["sync"] }
+notify = "8"
+http = "1"
+tower = { version = "0.5", features = ["util"] }
 
-# Logging, Tracing, Opentelemetry, Web Utilities
+# Logging, Tracing, OpenTelemetry, Web Utilities
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tower-http = { version = "0.6.11", features = ["trace", "cors"] }
@@ -28,6 +45,11 @@ utoipa-swagger-ui = { version = "9.0.2", features = ["axum", "vendored"] }
 # CLI Argument Parsing
 clap = { version = "4.6.6", features = ["derive", "env"] }
 
+[dev-dependencies]
+criterion = "0.5"
+http-body-util = "0.1"
+tempfile = "3"
+
 [[bin]]
 name = "vietcalendar"
 path = "src/main.rs"
@@ -36,6 +58,6 @@ path = "src/main.rs"
 name = "vietcalendar-mcp"
 path = "src/bin/vietcalendar-mcp.rs"
 
-
-
-
+[[bench]]
+name = "calendar_bench"
+harness = false

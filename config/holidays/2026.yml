@@ -1,0 +1,44 @@
+year: 2026
+source: "MOLISA / Ministry of Home Affairs Vietnam Official 2026 Public Holiday & Workday Swap Schedule"
+holidays:
+  - date: "2026-01-01"
+    name: "Tết Dương Lịch (New Year's Day)"
+    category: FixedSolar
+  - date: "2026-02-16"
+    name: "Tết Nguyên Đán Bính Ngọ (29 Tết - Giao Thừa)"
+    category: Lunar
+  - date: "2026-02-17"
+    name: "Tết Nguyên Đán Bính Ngọ (Mùng 1)"
+    category: Lunar
+  - date: "2026-02-18"
+    name: "Tết Nguyên Đán Bính Ngọ (Mùng 2)"
+    category: Lunar
+  - date: "2026-02-19"
+    name: "Tết Nguyên Đán Bính Ngọ (Mùng 3)"
+    category: Lunar
+  - date: "2026-02-20"
+    name: "Tết Nguyên Đán Bính Ngọ (Mùng 4)"
+    category: Lunar
+  - date: "2026-04-26"
+    name: "Giỗ Tổ Hùng Vương (10/3 Âm lịch - Chủ nhật)"
+    category: Lunar
+  - date: "2026-04-27"
+    name: "Giỗ Tổ Hùng Vương (Nghỉ bù)"
+    category: Compensatory
+  - date: "2026-04-30"
+    name: "Ngày Giải Phóng Miền Nam (Reunification Day)"
+    category: FixedSolar
+  - date: "2026-05-01"
+    name: "Ngày Quốc Tế Lao Động (International Workers' Day)"
+    category: FixedSolar
+  - date: "2026-08-31"
+    name: "Nghỉ hoán đổi Quốc Khánh (Swapped Bridge Day)"
+    category: Bridge
+  - date: "2026-09-01"
+    name: "Ngày nghỉ lễ Quốc Khánh (National Day Adjacent Holiday)"
+    category: FixedSolar
+  - date: "2026-09-02"
+    name: "Ngày Quốc Khánh (National Day)"
+    category: FixedSolar
+working_weekends:
+  - "2026-08-22"

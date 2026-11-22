@@ -1,0 +1,57 @@
+# VietCalendar (`vietcalendar-rs`)
+
+> Deterministic Vietnamese Luni-Solar calendar, MOLISA holidays, Can Chi & 24 Solar Terms, BaZi & Tử Vi astrology, Trạch Nhật, stateless lunar recurrence, and Vietnam retail season server powered by a non-blocking Cordis plugin kernel (anchored to Vietnam UTC+7).
+
+## Live Server Agent Discovery Endpoints
+
+When running `vietcalendar serve` (or `http-only` for REST discovery):
+
+- `/llms.txt`: Dynamic `llmstxt.org` Markdown index generated from currently active HTTP & MCP plugins
+- `/llms-full.txt`: Complete Markdown reference including full JSON `inputSchema` definitions for all live MCP tools
+- `/.well-known/mcp.json`: Machine-readable JSON descriptor listing active MCP transports (`/mcp`, `/mcp/sse`, `vietcalendar-mcp`), `protocol_version: "2024-11-05"`, dynamic `instructions`, active tools, resources, URI templates, and OpenAPI REST routes
+- `/api-docs/openapi.json`: Live composed OpenAPI 3.0 JSON specification
+- `/swagger-ui`: Interactive Swagger UI
+
+## Model Context Protocol (MCP `2024-11-05`)
+
+- Streamable HTTP POST: `POST /mcp` (and `POST /mcp/sse`)
+- Legacy SSE Stream: `GET /mcp/sse` + `POST /mcp/message?sessionId=<id>`
+- Local Stdio Binary: `vietcalendar-mcp` (or `vietcalendar mcp`)
+
+### Core Calendar & Holiday Tools (5)
+
+- `get_today_lunar`: Current solar & lunar date in Vietnam (UTC+7), leap status, and holiday flag
+- `convert_solar_to_lunar`: Solar (`YYYY-MM-DD` or `day`/`month`/`year`) to Vietnamese lunar date
+- `convert_lunar_to_solar`: Lunar date (with strict 29/30-day & `is_leap_month` validation) to solar date
+- `check_vietnam_holiday`: Official per-year holiday check honoring compensatory days & `working_weekends`
+- `get_year_holidays`: Complete holiday schedule + `working_weekends` for a target year
+
+### Cultural Intelligence & Niche Tools (11)
+
+- `get_can_chi`: Bilingual Lunar/BaZi year/month (*Ngũ Hổ Độn*), JDN day, hour (*Ngũ Thử Độn* with 23:00 rollover), Nạp Âm
+- `get_solar_terms`: All 24 astronomical solar terms (*Tiết Khí*) for any Gregorian year
+- `get_active_solar_term`: Ecliptic solar longitude plus current & next *Tiết Khí*
+- `generate_bazi_chart`: Four Pillars, Hidden Stems (*Tàng Can*), Ten Gods (*Thập Thần*), Five Elements, 8×10yr *Đại Vận*
+- `generate_tuvi_chart`: Vietnamese Tử Vi Nam Phái Core (~50 major stars, 12 palaces, *Mệnh*/*Thân*, *Cục*, *Tứ Hóa*, *Vòng Thái Tuế*, *Vòng Trường Sinh*, *Tuần*/*Triệt*, *Đại Hạn*)
+- `analyze_auspicious_date`: Trạch Nhật day scoring (*Hoàng Đạo*, 12 *Trực*, 28 *Tú*, major taboos, *Tam Tai*/*Kim Lâu*/*Hoang Ốc*/*Xung Tuổi*)
+- `find_auspicious_dates`: Ranked auspicious date finder across `<= 366` days
+- `expand_lunar_recurrence`: Stateless `<= 50`-year lunar recurrence resolving `Day30Policy` & `LeapMonthPolicy`
+- `export_lunar_ics`: RFC 5545 `.ics` VCALENDAR export (`CRLF`, `<= 75`-octet UTF-8 folding, optional `VALARM`)
+- `get_retail_calendar`: Hot-reloadable 14 Vietnam retail peaks + monthly Mùng 1/Rằm with campaign milestones
+- `get_upcoming_retail_peaks`: Lookahead Vietnam retail peaks (`1..=366` days) with prep/early-bird/peak dates
+
+### Resources & URI Templates
+
+- `calendar://today`
+- `calendar://holidays/<current_year>`
+- `calendar://holidays/{year}`
+- `canchi://solar-terms/{year}`
+- `retail://calendar/{year}`
+
+## Repository Documentation
+
+- [README.md](README.md): Overview, Cordis profile matrix, REST endpoints & `curl` examples, local dev & benchmarks
+- [docs/mcp_setup.md](docs/mcp_setup.md): Complete MCP client setup presets (Claude Desktop, Cursor, Antigravity/Gemini CLI) & tool schema guide
+- [AGENTS.md](AGENTS.md): Contributor/agent architectural invariants and build/test commands
+- [docs/ARCHITECTURE_DECISIONS.md](docs/ARCHITECTURE_DECISIONS.md): Architecture Decision Records (`ADR 1–15` / `ADR-013`)
+- [docs/specs/INDEX.md](docs/specs/INDEX.md): Five-document feature specifications (`REQ-001`–`REQ-043`)

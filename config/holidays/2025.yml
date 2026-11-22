@@ -1,0 +1,53 @@
+year: 2025
+source: "MOLISA Vietnam Official 2025 Public Holiday & Workday Swap Schedule"
+holidays:
+  - date: "2025-01-01"
+    name: "Tết Dương Lịch (New Year's Day)"
+    category: FixedSolar
+  - date: "2025-01-25"
+    name: "Tết Nguyên Đán Ất Tỵ (26 Tết - Weekend Break Start)"
+    category: Lunar
+  - date: "2025-01-26"
+    name: "Tết Nguyên Đán Ất Tỵ (27 Tết - Weekend Break)"
+    category: Lunar
+  - date: "2025-01-27"
+    name: "Tết Nguyên Đán Ất Tỵ (28 Tết)"
+    category: Lunar
+  - date: "2025-01-28"
+    name: "Tết Nguyên Đán Ất Tỵ (29 Tết - Giao Thừa)"
+    category: Lunar
+  - date: "2025-01-29"
+    name: "Tết Nguyên Đán Ất Tỵ (Mùng 1)"
+    category: Lunar
+  - date: "2025-01-30"
+    name: "Tết Nguyên Đán Ất Tỵ (Mùng 2)"
+    category: Lunar
+  - date: "2025-01-31"
+    name: "Tết Nguyên Đán Ất Tỵ (Mùng 3)"
+    category: Lunar
+  - date: "2025-02-01"
+    name: "Tết Nguyên Đán Ất Tỵ (Mùng 4 - Weekend Break)"
+    category: Lunar
+  - date: "2025-02-02"
+    name: "Tết Nguyên Đán Ất Tỵ (Mùng 5 - Weekend Break End)"
+    category: Lunar
+  - date: "2025-04-07"
+    name: "Giỗ Tổ Hùng Vương (10/3 Âm lịch)"
+    category: Lunar
+  - date: "2025-04-30"
+    name: "Ngày Giải Phóng Miền Nam (Reunification Day)"
+    category: FixedSolar
+  - date: "2025-05-01"
+    name: "Ngày Quốc Tế Lao Động (International Workers' Day)"
+    category: FixedSolar
+  - date: "2025-05-02"
+    name: "Nghỉ hoán đổi 30/4 - 1/5 (Swapped Bridge Day)"
+    category: Bridge
+  - date: "2025-09-01"
+    name: "Ngày nghỉ lễ Quốc Khánh (National Day Adjacent Holiday)"
+    category: FixedSolar
+  - date: "2025-09-02"
+    name: "Ngày Quốc Khánh (National Day)"
+    category: FixedSolar
+working_weekends:
+  - "2025-04-26"

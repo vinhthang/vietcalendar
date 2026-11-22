@@ -1,0 +1,281 @@
+profiles:
+  serve:
+    - id: telemetry
+      plugin: telemetry
+      enabled: true
+      config:
+        default_filter: "info,vietcalendar_rs=debug,tower_http=debug"
+        otlp_enabled: false
+    - id: calendar_vn
+      plugin: calendar_vn
+      enabled: true
+      config:
+        cache_capacity: 4096
+    - id: holidays_vn
+      plugin: holidays_vn
+      enabled: true
+      config:
+        holidays_dir: "holidays"
+        cache_capacity: 256
+    - id: canchi_solar_vn
+      plugin: canchi_solar_vn
+      enabled: true
+      config: {}
+    - id: astrology_vn
+      plugin: astrology_vn
+      enabled: true
+      config: {}
+    - id: trach_nhat_vn
+      plugin: trach_nhat_vn
+      enabled: true
+      config: {}
+    - id: recurrence_vn
+      plugin: recurrence_vn
+      enabled: true
+      config: {}
+    - id: retail_vn
+      plugin: retail_vn
+      enabled: true
+      config:
+        catalog_path: "retail_events.yml"
+    - id: http_server
+      plugin: http_server
+      enabled: true
+      config:
+        host: "0.0.0.0"
+        # port omitted so fallback resolves: CLI --port -> YAML port -> $PORT -> $HTTP_PORT -> 8080
+        bind: true
+    - id: http_calendar
+      plugin: http_calendar
+      enabled: true
+      config: {}
+    - id: http_holidays
+      plugin: http_holidays
+      enabled: true
+      config: {}
+    - id: http_canchi
+      plugin: http_canchi
+      enabled: true
+      config: {}
+    - id: http_astrology
+      plugin: http_astrology
+      enabled: true
+      config: {}
+    - id: http_trach_nhat
+      plugin: http_trach_nhat
+      enabled: true
+      config: {}
+    - id: http_recurrence
+      plugin: http_recurrence
+      enabled: true
+      config: {}
+    - id: http_retail
+      plugin: http_retail
+      enabled: true
+      config: {}
+    - id: openapi
+      plugin: openapi
+      enabled: true
+      config:
+        title: "Vietnam Lunar Calendar API"
+        version: "0.2.0"
+        description: "Non-blocking plugin-based API for Vietnamese Luni-Solar dates, Can Chi, BaZi/Tử Vi, Trạch Nhật, Recurrence, and Retail Seasons."
+    - id: http_discovery
+      plugin: http_discovery
+      enabled: true
+      config: {}
+    - id: mcp_core
+      plugin: mcp_core
+      enabled: true
+      config: {}
+    - id: mcp_tools
+      plugin: mcp_tools
+      enabled: true
+      config: {}
+    - id: mcp_canchi
+      plugin: mcp_canchi
+      enabled: true
+      config: {}
+    - id: mcp_astrology
+      plugin: mcp_astrology
+      enabled: true
+      config: {}
+    - id: mcp_trach_nhat
+      plugin: mcp_trach_nhat
+      enabled: true
+      config: {}
+    - id: mcp_recurrence
+      plugin: mcp_recurrence
+      enabled: true
+      config: {}
+    - id: mcp_retail
+      plugin: mcp_retail
+      enabled: true
+      config: {}
+    - id: mcp_http
+      plugin: mcp_http
+      enabled: true
+      config:
+        session_channel_capacity: 64
+    - id: config_reloader
+      plugin: config_reloader
+      enabled: true
+      config:
+        debounce_ms: 200
+
+  mcp-stdio:
+    - id: calendar_vn
+      plugin: calendar_vn
+      enabled: true
+      config:
+        cache_capacity: 2048
+    - id: holidays_vn
+      plugin: holidays_vn
+      enabled: true
+      config:
+        holidays_dir: "holidays"
+        cache_capacity: 256
+    - id: canchi_solar_vn
+      plugin: canchi_solar_vn
+      enabled: true
+      config: {}
+    - id: astrology_vn
+      plugin: astrology_vn
+      enabled: true
+      config: {}
+    - id: trach_nhat_vn
+      plugin: trach_nhat_vn
+      enabled: true
+      config: {}
+    - id: recurrence_vn
+      plugin: recurrence_vn
+      enabled: true
+      config: {}
+    - id: retail_vn
+      plugin: retail_vn
+      enabled: true
+      config:
+        catalog_path: "retail_events.yml"
+    - id: mcp_core
+      plugin: mcp_core
+      enabled: true
+      config: {}
+    - id: mcp_tools
+      plugin: mcp_tools
+      enabled: true
+      config: {}
+    - id: mcp_canchi
+      plugin: mcp_canchi
+      enabled: true
+      config: {}
+    - id: mcp_astrology
+      plugin: mcp_astrology
+      enabled: true
+      config: {}
+    - id: mcp_trach_nhat
+      plugin: mcp_trach_nhat
+      enabled: true
+      config: {}
+    - id: mcp_recurrence
+      plugin: mcp_recurrence
+      enabled: true
+      config: {}
+    - id: mcp_retail
+      plugin: mcp_retail
+      enabled: true
+      config: {}
+    - id: mcp_stdio
+      plugin: mcp_stdio
+      enabled: true
+      config: {}
+    - id: config_reloader
+      plugin: config_reloader
+      enabled: true
+      config:
+        debounce_ms: 200
+
+  http-only:
+    - id: telemetry
+      plugin: telemetry
+      enabled: true
+      config:
+        default_filter: "info,vietcalendar_rs=debug,tower_http=debug"
+        otlp_enabled: false
+    - id: calendar_vn
+      plugin: calendar_vn
+      enabled: true
+      config:
+        cache_capacity: 4096
+    - id: holidays_vn
+      plugin: holidays_vn
+      enabled: true
+      config:
+        holidays_dir: "holidays"
+        cache_capacity: 256
+    - id: canchi_solar_vn
+      plugin: canchi_solar_vn
+      enabled: true
+      config: {}
+    - id: astrology_vn
+      plugin: astrology_vn
+      enabled: true
+      config: {}
+    - id: trach_nhat_vn
+      plugin: trach_nhat_vn
+      enabled: true
+      config: {}
+    - id: recurrence_vn
+      plugin: recurrence_vn
+      enabled: true
+      config: {}
+    - id: retail_vn
+      plugin: retail_vn
+      enabled: true
+      config:
+        catalog_path: "retail_events.yml"
+    - id: http_server
+      plugin: http_server
+      enabled: true
+      config:
+        host: "0.0.0.0"
+        # port omitted so fallback resolves: CLI --port -> YAML port -> $PORT -> $HTTP_PORT -> 8080
+        bind: true
+    - id: http_calendar
+      plugin: http_calendar
+      enabled: true
+      config: {}
+    - id: http_holidays
+      plugin: http_holidays
+      enabled: true
+      config: {}
+    - id: http_canchi
+      plugin: http_canchi
+      enabled: true
+      config: {}
+    - id: http_astrology
+      plugin: http_astrology
+      enabled: true
+      config: {}
+    - id: http_trach_nhat
+      plugin: http_trach_nhat
+      enabled: true
+      config: {}
+    - id: http_recurrence
+      plugin: http_recurrence
+      enabled: true
+      config: {}
+    - id: http_retail
+      plugin: http_retail
+      enabled: true
+      config: {}
+    - id: openapi
+      plugin: openapi
+      enabled: true
+      config:
+        title: "Vietnam Lunar Calendar API"
+        version: "0.2.0"
+        description: "Non-blocking plugin-based API for Vietnamese Luni-Solar dates, Can Chi, BaZi/Tử Vi, Trạch Nhật, Recurrence, and Retail Seasons."
+    - id: http_discovery
+      plugin: http_discovery
+      enabled: true
+      config: {}

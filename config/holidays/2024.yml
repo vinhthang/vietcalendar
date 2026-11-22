@@ -1,0 +1,47 @@
+year: 2024
+source: "MOLISA Vietnam Official 2024 Public Holiday & Workday Swap Schedule"
+holidays:
+  - date: "2024-01-01"
+    name: "Tết Dương Lịch (New Year's Day)"
+    category: FixedSolar
+  - date: "2024-02-08"
+    name: "Tết Nguyên Đán Giáp Thìn (29 Tết)"
+    category: Lunar
+  - date: "2024-02-09"
+    name: "Tết Nguyên Đán Giáp Thìn (30 Tết - Giao Thừa)"
+    category: Lunar
+  - date: "2024-02-10"
+    name: "Tết Nguyên Đán Giáp Thìn (Mùng 1)"
+    category: Lunar
+  - date: "2024-02-11"
+    name: "Tết Nguyên Đán Giáp Thìn (Mùng 2)"
+    category: Lunar
+  - date: "2024-02-12"
+    name: "Tết Nguyên Đán Giáp Thìn (Mùng 3)"
+    category: Lunar
+  - date: "2024-02-13"
+    name: "Tết Nguyên Đán Giáp Thìn (Nghỉ bù Mùng 1)"
+    category: Compensatory
+  - date: "2024-02-14"
+    name: "Tết Nguyên Đán Giáp Thìn (Nghỉ bù Mùng 2)"
+    category: Compensatory
+  - date: "2024-04-18"
+    name: "Giỗ Tổ Hùng Vương (10/3 Âm lịch)"
+    category: Lunar
+  - date: "2024-04-29"
+    name: "Nghỉ hoán đổi 30/4 - 1/5 (Swapped Bridge Day)"
+    category: Bridge
+  - date: "2024-04-30"
+    name: "Ngày Giải Phóng Miền Nam (Reunification Day)"
+    category: FixedSolar
+  - date: "2024-05-01"
+    name: "Ngày Quốc Tế Lao Động (International Workers' Day)"
+    category: FixedSolar
+  - date: "2024-09-02"
+    name: "Ngày Quốc Khánh (National Day)"
+    category: FixedSolar
+  - date: "2024-09-03"
+    name: "Ngày nghỉ lễ Quốc Khánh (National Day Adjacent Holiday)"
+    category: FixedSolar
+working_weekends:
+  - "2024-05-04"
