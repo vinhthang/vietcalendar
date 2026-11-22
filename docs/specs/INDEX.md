@@ -11,3 +11,4 @@
 | 2026-11-21-nonblocking-plugin-refactor | Non-Blocking Plugin Refactor and Debt Remediation | In-Testing | REQ-027..REQ-035 | ADR-009, ADR-010 | [spec](./2026-11-21-nonblocking-plugin-refactor/spec.md) |
 | 2026-11-21-niche-lunar-mcp-plugins | Niche Lunar Calendar & Cultural Intelligence MCP/REST Plugins | In-Testing | REQ-036..REQ-041 | ADR-011, ADR-012 | [spec](./2026-11-21-niche-lunar-mcp-plugins/spec.md) |
 | 2026-11-22-agent-discovery-llms-txt | Dynamic AI Agent Discovery (`llms.txt`, `/.well-known/mcp.json`, MCP Instructions) & Synchronized Docs | In-Testing | REQ-042..REQ-043 | ADR-013 | [spec](./2026-11-22-agent-discovery-llms-txt/spec.md) |
+| 2026-11-22-mcp-unknown-tool-invalid-params | Unknown MCP Tool Returns Invalid Params (`-32602`) | In-Testing | REQ-044 | None | [spec](./2026-11-22-mcp-unknown-tool-invalid-params/spec.md) |

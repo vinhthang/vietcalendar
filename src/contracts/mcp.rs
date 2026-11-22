@@ -78,9 +78,9 @@ impl JsonRpcResponse {
 pub enum McpError {
     /// Malformed JSON payload (`-32700`).
     ParseError(String),
-    /// Unknown JSON-RPC method or tool name (`-32601`).
+    /// Unknown JSON-RPC method (`-32601`).
     MethodNotFound(String),
-    /// Missing or invalid tool/resource parameters (`-32602`).
+    /// Missing or invalid tool/resource parameters, including unknown tool name (`-32602`).
     InvalidParams(String),
     /// Internal server error (`-32603`).
     Internal(String),

@@ -33,7 +33,7 @@ Brownfield specification baseline requested by user: "Analyze this project, writ
 
 ### REQ-014: Five-Tool MCP Catalog (`tools/list` and `tools/call`)
 
-- Current contract: Changed by [nonblocking-plugin-refactor/REQ-031](../2026-11-21-nonblocking-plugin-refactor/spec.md#req-031-pluggable-mcp-core-registry-and-unified-toolresource-plugin)
+- Current contract: Changed by [mcp-unknown-tool-invalid-params/REQ-044](../2026-11-22-mcp-unknown-tool-invalid-params/spec.md#req-044-unknown-mcp-tool-returns-invalid-params)
 - Source intent: Baseline behavior in `src/mcp.rs::handle_request` (`tools/list`, `tools/call`, `parse_solar_input`, `compute_holiday_list_for_year`) verified by `test_mcp_tools_list`, `test_mcp_convert_solar_to_lunar_call`, and `test_mcp_convert_lunar_to_solar_call`.
 - Statement: WHEN handling `tools/list` or `tools/call`, THE MCP engine SHALL expose and execute 5 tools (`get_today_lunar`, `convert_solar_to_lunar`, `convert_lunar_to_solar`, `check_vietnam_holiday`, `get_year_holidays`), returning pretty-printed JSON inside `content[0].text` (`type: "text"`).
 - AC-014-1 — Success: `tools/list` returns exactly 5 tool definitions; `convert_solar_to_lunar` (`"2024-02-10"`) yields lunar `1/1/2024`; `convert_lunar_to_solar` (`1/1/2024`, `is_leap_month: false`) yields `"2024-02-10"`; `get_year_holidays` returns `{ year, total_holidays, holidays }`.

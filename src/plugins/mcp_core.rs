@@ -195,7 +195,7 @@ impl McpRegistryService for McpCoreEngine {
                 let Some(handler) = handler else {
                     return Some(JsonRpcResponse::error(
                         id,
-                        -32601,
+                        -32602,
                         format!("Tool not found: {name}"),
                     ));
                 };
@@ -446,7 +446,7 @@ mod tests {
                 params: Some(json!({ "name": "missing" })),
             })
             .unwrap();
-        assert_eq!(unknown_tool.error.unwrap().code, -32601);
+        assert_eq!(unknown_tool.error.unwrap().code, -32602);
     }
 
     #[test]

@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
+use notify::event::{AccessKind, AccessMode, EventKind, MetadataKind, ModifyKind};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Deserialize;
 use serde_json::Value;
@@ -130,6 +131,20 @@ pub async fn reload_from_disk(
     Ok(())
 }
 
+/// Returns `true` only for mutating filesystem events that can alter configuration on disk.
+///
+/// Read-only `Access` events (such as Linux `inotify` `IN_OPEN` / `IN_CLOSE_NOWRITE`) and
+/// `AccessTime` metadata updates are ignored so `reload_from_disk` reads never self-trigger.
+pub(crate) fn should_trigger_reload(event: &notify::Event) -> bool {
+    match event.kind {
+        EventKind::Create(_) | EventKind::Remove(_) => true,
+        EventKind::Modify(ModifyKind::Metadata(MetadataKind::AccessTime)) => false,
+        EventKind::Modify(_) => true,
+        EventKind::Access(AccessKind::Close(AccessMode::Write)) => true,
+        EventKind::Access(_) | EventKind::Any | EventKind::Other => false,
+    }
+}
+
 /// Cordis plugin watching `config/` via non-blocking `notify` + `SIGHUP` for live hot-reload.
 #[derive(Debug, Default)]
 pub struct ConfigReloaderPlugin;
@@ -162,15 +177,18 @@ impl Plugin for ConfigReloaderPlugin {
 
             let (tx, mut rx) = mpsc::channel::<()>(16);
             let tx_watch = tx.clone();
-            let mut watcher: RecommendedWatcher = notify::recommended_watcher(move |res| {
-                if let Ok(_event) = res {
-                    let _ = tx_watch.try_send(());
-                }
-            })
-            .map_err(|e| KernelError::MountFailed {
-                fiber_id: ctx.fiber_id().to_string(),
-                reason: format!("failed to create OS file watcher: {e}"),
-            })?;
+            let mut watcher: RecommendedWatcher =
+                notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+                    if let Ok(event) = res {
+                        if should_trigger_reload(&event) {
+                            let _ = tx_watch.try_send(());
+                        }
+                    }
+                })
+                .map_err(|e| KernelError::MountFailed {
+                    fiber_id: ctx.fiber_id().to_string(),
+                    reason: format!("failed to create OS file watcher: {e}"),
+                })?;
 
             watcher
                 .watch(&anchor.config_dir, RecursiveMode::Recursive)
@@ -449,5 +467,99 @@ working_weekends:
         assert!(!hol.is_holiday(NaiveDate::from_ymd_opt(2026, 8, 22).unwrap()));
 
         kernel.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn test_hot_reload_does_not_self_trigger_on_read_events() {
+        let temp = TempDir::new().unwrap();
+        let holidays_dir = temp.path().join("holidays");
+        fs::create_dir_all(&holidays_dir).unwrap();
+        fs::copy("config/cordis.yml", temp.path().join("cordis.yml")).unwrap();
+        fs::copy(
+            "config/cordis.patch.yml",
+            temp.path().join("cordis.patch.yml"),
+        )
+        .unwrap();
+        fs::copy(
+            "config/retail_events.yml",
+            temp.path().join("retail_events.yml"),
+        )
+        .unwrap();
+        fs::copy("config/holidays/2026.yml", holidays_dir.join("2026.yml")).unwrap();
+
+        let kernel = boot_profile(temp.path(), "serve", None, Some(false))
+            .await
+            .unwrap();
+        let mut events = kernel.subscribe();
+
+        fs::write(
+            temp.path().join("cordis.patch.yml"),
+            "patches:\n  - id: config_reloader\n    config:\n      debounce_ms: 50\n",
+        )
+        .unwrap();
+
+        tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                if let Ok(KernelEvent::ConfigReloaded { .. }) = events.recv().await {
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("timed out waiting for initial ConfigReloaded");
+
+        // Explicitly read config files as reload_from_disk() does; read-only inotify Access
+        // events must NOT schedule another reload cycle.
+        let _ = fs::read_to_string(temp.path().join("cordis.yml")).unwrap();
+        let _ = fs::read_to_string(temp.path().join("retail_events.yml")).unwrap();
+        let _ = fs::read_to_string(holidays_dir.join("2026.yml")).unwrap();
+
+        let deadline = tokio::time::Instant::now() + Duration::from_millis(600);
+        loop {
+            match tokio::time::timeout_at(deadline, events.recv()).await {
+                Err(_) => break,
+                Ok(Ok(KernelEvent::ConfigReloaded { source })) => {
+                    panic!("spurious ConfigReloaded triggered on read-only access for {source}");
+                }
+                Ok(_) => {}
+            }
+        }
+
+        kernel.shutdown().await;
+    }
+
+    #[test]
+    fn test_should_trigger_reload_filters_read_access_and_atime_events() {
+        use notify::event::{CreateKind, DataChange, RemoveKind, RenameMode};
+
+        for kind in [
+            EventKind::Create(CreateKind::File),
+            EventKind::Remove(RemoveKind::File),
+            EventKind::Modify(ModifyKind::Data(DataChange::Content)),
+            EventKind::Modify(ModifyKind::Name(RenameMode::Both)),
+            EventKind::Modify(ModifyKind::Metadata(MetadataKind::WriteTime)),
+            EventKind::Access(AccessKind::Close(AccessMode::Write)),
+        ] {
+            let ev = notify::Event::new(kind);
+            assert!(
+                should_trigger_reload(&ev),
+                "expected mutating event {kind:?} to trigger reload"
+            );
+        }
+
+        for kind in [
+            EventKind::Access(AccessKind::Open(AccessMode::Any)),
+            EventKind::Access(AccessKind::Close(AccessMode::Read)),
+            EventKind::Access(AccessKind::Read),
+            EventKind::Modify(ModifyKind::Metadata(MetadataKind::AccessTime)),
+            EventKind::Any,
+            EventKind::Other,
+        ] {
+            let ev = notify::Event::new(kind);
+            assert!(
+                !should_trigger_reload(&ev),
+                "expected non-mutating event {kind:?} to be ignored"
+            );
+        }
     }
 }

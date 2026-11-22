@@ -54,9 +54,9 @@ Governing specification: [spec.md](./spec.md)
 
 ### AC-026-1 (REQ-026)
 
-- Method: Integration test `test_live_yaml_hot_reload_and_malformed_rollback` in `tests/integration_test.rs` watching `TempDir`.
-- Expected outcome: Valid YAML changes trigger debounced reload, updating live kernel plugins and `HolidayService` schedules without restarting.
-- Execution: [Run 1](#run-1--2026-11-21)
+- Method: Integration test `test_live_yaml_hot_reload_and_malformed_rollback` in `tests/integration_test.rs` watching `TempDir` plus unit tests `plugins::config_reloader::tests::{test_hot_reload_does_not_self_trigger_on_read_events, test_should_trigger_reload_filters_read_access_and_atime_events}`.
+- Expected outcome: Valid YAML changes trigger debounced reload, updating live kernel plugins and `HolidayService` schedules without restarting, and read-only `inotify` access events never self-trigger reload loops.
+- Execution: [Run 1](#run-1--2026-11-21), [Run 2](#run-2--2026-11-22)
 
 ### AC-026-2 (REQ-026)
 
@@ -92,6 +92,24 @@ Governing specification: [spec.md](./spec.md)
   ```
 - Result: AC-022-1 `PASS`, AC-022-2 `PASS`, AC-023-1 `PASS`, AC-023-2 `PASS`, AC-024-1 `PASS`, AC-024-2 `PASS`, AC-025-1 `PASS`, AC-025-2 `PASS`, AC-026-1 `PASS`, AC-026-2 `PASS` — all Cordis kernel lifecycle, reactive injection (`58.8 ns`), `ctx.fork`, YAML reconciliation, and `notify` hot-reload checks passed with 0 compiler warnings.
 
+### Run 2 — 2026-11-22
+
+- Checked: REQ-026 / AC-026-1, AC-026-2 Case 1 `notify` read-event loop fix (`rustc 1.97.1` / `cargo 1.97.1`, `rustfmt 1.9.0`, `clippy 0.1.97`)
+- Command: `cargo fmt --all -- --check && cargo clippy --offline --all-targets -- -D warnings && RUSTFLAGS="-D warnings" cargo test --offline --all-targets && CARGO_NET_OFFLINE=true cargo mutants --timeout 60 -j 2 -f src/plugins/config_reloader.rs --re should_trigger_reload -- --lib plugins::config_reloader` (exit code: `0`)
+- Output excerpt:
+  ```text
+  RED baseline (test_hot_reload_does_not_self_trigger_on_read_events before filter):
+    test result: FAILED. 0 passed; 1 failed
+
+  GREEN verification after should_trigger_reload filter:
+    cargo clippy: No issues found
+    plugins::config_reloader: ok. 5 passed; 0 failed
+    src/lib.rs unit tests: ok. 72 passed; 0 failed; 0 ignored
+    tests/integration_test.rs: ok. 8 passed; 0 failed; 0 ignored
+    cargo mutants (should_trigger_reload): 2 mutants tested: 2 caught (100%)
+  ```
+- Result: AC-026-1 `PASS`, AC-026-2 `PASS` — `should_trigger_reload` eliminates Linux `inotify` read-access self-triggers while preserving live config/holiday hot-reload and malformed YAML rollback.
+
 ## Real-world observations
 
-No real-world confirmation has been recorded.
+- `2026-11-22`: Live production pod `apps/vietcalendar-68f7b7d6f5-76r5w` (`v0.2.0` at `sha256:2f42b796...` on `amd11` Linux) exhibited continuous `INFO hot-reloaded configuration and holiday schedules` log lines (`~1/s`) caused by Linux `inotify` `EventKind::Access` events on YAML reads; reproduced via `test_hot_reload_does_not_self_trigger_on_read_events` and fixed in Case 1 [Task 3](./tasks.md#task-3) (awaiting live cluster re-verification after image rollout before promoting to `Verified`).

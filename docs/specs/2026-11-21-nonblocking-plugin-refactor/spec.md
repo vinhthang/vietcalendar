@@ -62,6 +62,7 @@ User request: "review architecture, I want a clean, none blocking, and performan
 
 ### REQ-031: Pluggable MCP Core Registry and Unified Tool/Resource Plugin
 
+- Current contract: Changed by [mcp-unknown-tool-invalid-params/REQ-044](../2026-11-22-mcp-unknown-tool-invalid-params/spec.md#req-044-unknown-mcp-tool-returns-invalid-params)
 - Changes: [mcp-server/REQ-014](../2026-11-21-mcp-server/spec.md#req-014-five-tool-mcp-catalog-toolslist-and-toolscall)
 - Source intent: `TD-01`, `TD-03`, `TD-07` remediation and Cordis MCP modularity (`McpCorePlugin` + `McpToolsPlugin` + `McpStdioPlugin`).
 - Previous contract: `src/mcp.rs` hardcoded a `match` table, used `compute_holiday_list_for_year` (missing compensatory/bridge days), skipped `1..=12`/`1..=30` lunar validation, cast `i64 as i32`, and hardcoded `calendar://holidays/2026`.
